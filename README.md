@@ -17,6 +17,45 @@
    http://127.0.0.1:3000
    ```
 
+## Testing Stage 4 (Allocation Algorithm)
+
+The allocation algorithm automatically assigns clients to managers in a balanced way.
+
+**Prerequisites:**
+- Have managers added
+- Have clients imported
+
+**Test with curl:**
+
+1. **Add some managers:**
+   ```bash
+   curl -X POST http://127.0.0.1:3000/api/managers -H "Content-Type: application/json" -d '{"name":"Alice"}'
+   curl -X POST http://127.0.0.1:3000/api/managers -H "Content-Type: application/json" -d '{"name":"Bob"}'
+   curl -X POST http://127.0.0.1:3000/api/managers -H "Content-Type: application/json" -d '{"name":"Carol"}'
+   ```
+
+2. **Import an Excel file** (via Postman or browser once frontend is ready)
+
+3. **Run allocation:**
+   ```bash
+   curl -X POST http://127.0.0.1:3000/api/allocate
+   ```
+
+4. **Check results:**
+   ```bash
+   curl http://127.0.0.1:3000/api/state
+   ```
+
+You should see clients now have Manager assignments!
+
+**Test in Browser Console:**
+```javascript
+// Run allocation
+fetch('/api/allocate', { method: 'POST' })
+  .then(r => r.json())
+  .then(data => console.log(data));
+```
+
 ## Testing Stage 3 (Backend API)
 
 Start the server and test API endpoints:
@@ -40,7 +79,7 @@ In another terminal or browser:
    ```
 
 3. **Open in browser:**
-   Visit `http://127.0.0.1:3000` (will show 404 until Stage 5 is complete)
+   Visit `http://127.0.0.1:3000`
 
 ## Testing Stage 2 (Excel Import)
 
@@ -66,7 +105,8 @@ In another terminal or browser:
 workload-allocation/
 ├── src/
 │   ├── import.js      # Excel import logic
-│   └── storage.js     # Data persistence
+│   ├── storage.js     # Data persistence
+│   └── allocate.js    # Allocation algorithm
 ├── public/            # Frontend files (coming in Stage 5)
 ├── data/              # Persistent storage (auto-created)
 ├── output/            # Exported Excel files
@@ -84,13 +124,14 @@ workload-allocation/
 - `DELETE /api/managers/:name` - Delete manager
 - `PUT /api/managers/:name/capacity` - Update capacity
 - `PATCH /api/clients/:id` - Update client assignment
+- `POST /api/allocate` - Run allocation algorithm
 
 ## Development Stages
 
 - ✅ Stage 1: Project Setup
 - ✅ Stage 2: Excel Import
 - ✅ Stage 3: Backend API & Storage
-- ⏳ Stage 4: Allocation Algorithm
+- ✅ Stage 4: Allocation Algorithm
 - ⏳ Stage 5: Frontend Structure
 - ⏳ Stage 6: Frontend Logic
 - ⏳ Stage 7: Excel Export

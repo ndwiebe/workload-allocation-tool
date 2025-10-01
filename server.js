@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { importExcel } = require('./src/import');
 const { loadState, saveState } = require('./src/storage');
+const { allocate } = require('./src/allocate');
 
 const app = express();
 const PORT = 3000;
@@ -200,6 +201,34 @@ app.patch('/api/clients/:id', async (req, res, next) => {
     await saveState(state);
     
     res.json({ success: true, state });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/allocate
+ * Run the allocation algorithm to automatically assign clients to managers
+ */
+app.post('/api/allocate', async (req, res, next) => {
+  try {
+    const state = await loadState();
+    
+    if (state.managers.length === 0) {
+      throw new Error('No managers defined');
+    }
+    
+    if (state.clients.length === 0) {
+      throw new Error('No clients to allocate');
+    }
+    
+    // Run the allocation algorithm
+    // This modifies the clients array in place
+    allocate(state.managers, state.clients, state.managerCapacity);
+    
+    await saveState(state);
+    
+    res.json({ success: true, message: 'Allocation complete', state });
   } catch (error) {
     next(error);
   }

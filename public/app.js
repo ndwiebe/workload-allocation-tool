@@ -243,7 +243,7 @@ async function handleDrop(e) {
   }
 }
 
-async function moveClient(clientId, manager) {
+async function moveClient(clientId, manager, skipRender = false) {
   try {
     const response = await fetch(`/api/clients/${clientId}`, {
       method: 'PATCH',
@@ -254,7 +254,9 @@ async function moveClient(clientId, manager) {
     const data = await response.json();
     if (data.success) {
       state = data.state;
-      renderUI();
+      if (!skipRender) {
+        renderUI();
+      }
     } else {
       alert('Error: ' + data.error);
     }
@@ -268,9 +270,15 @@ async function moveGroup(groupName, manager) {
   const groupClients = state.clients.filter(c => c.Group === groupName);
   
   try {
-    for (const client of groupClients) {
-      await moveClient(client.id, manager);
-    }
+    // Make all API calls in parallel for better performance
+    await Promise.all(
+      groupClients.map(client => 
+        moveClient(client.id, manager, true) // skipRender = true
+      )
+    );
+    
+    // Reload state once after all moves complete
+    await loadState();
   } catch (error) {
     console.error('Error moving group:', error);
     alert('Error moving group');

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workload Allocation Tool</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+    }
+    .status {
+      background-color: #4CAF50;
+      color: white;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    .coming-soon {
+      background-color: #FF9800;
+      color: white;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    .stages {
+      margin-top: 30px;
+    }
+    .stage {
+      padding: 10px;
+      margin: 5px 0;
+      border-left: 4px solid #4CAF50;
+      background-color: #f9f9f9;
+    }
+    .stage.pending {
+      border-left-color: #ccc;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Workload Allocation Tool</h1>
+    
+    <div class="status">
+      <strong>✅ Server is running!</strong>
+      <p>Backend API is ready and accepting requests.</p>
+    </div>
+    
+    <div class="coming-soon">
+      <strong>⏳ User Interface Coming Soon</strong>
+      <p>The web interface will be built in Stage 5 and Stage 6.</p>
+    </div>
+    
+    <h2>Development Progress</h2>
+    <div class="stages">
+      <div class="stage">✅ Stage 1: Project Setup</div>
+      <div class="stage">✅ Stage 2: Excel Import Module</div>
+      <div class="stage">✅ Stage 3: Backend API & Storage</div>
+      <div class="stage pending">⏳ Stage 4: Allocation Algorithm</div>
+      <div class="stage pending">⏳ Stage 5: Frontend Structure</div>
+      <div class="stage pending">⏳ Stage 6: Frontend Logic</div>
+      <div class="stage pending">⏳ Stage 7: Excel Export</div>
+    </div>
+    
+    <h2>Test the API</h2>
+    <p>Open your browser console (F12) and try:</p>
+    <pre style="background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto;">
+fetch('/api/state')
+  .then(r => r.json())
+  .then(data => console.log(data));</pre>
+    
+    <p>Or use curl in your terminal:</p>
+    <pre style="background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto;">curl http://127.0.0.1:3000/api/state</pre>
+  </div>
+</body>
+</html>

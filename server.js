@@ -11,6 +11,15 @@ const app = express();
 const PORT = 3000;
 const HOST = '127.0.0.1';
 
+// Ensure required directories exist at startup
+const requiredDirs = ['./data', './uploads', './output'];
+requiredDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`Created directory: ${dir}`);
+  }
+});
+
 // Middleware - order matters!
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

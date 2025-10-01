@@ -26,6 +26,92 @@ function setupEventListeners() {
   });
 }
 
+/**
+ * Show loading indicator with custom message
+ * @param {string} message - Loading message to display
+ */
+function showLoading(message = 'Processing...') {
+  // Create loading overlay if it doesn't exist
+  let overlay = document.getElementById('loadingOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'loadingOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    `;
+    
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: white;
+      padding: 30px 40px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      text-align: center;
+    `;
+    
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    spinner.style.cssText = `
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4CAF50;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    `;
+    
+    const text = document.createElement('div');
+    text.id = 'loadingText';
+    text.style.cssText = `
+      color: #333;
+      font-size: 16px;
+      font-weight: 500;
+    `;
+    text.textContent = message;
+    
+    content.appendChild(spinner);
+    content.appendChild(text);
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+    
+    // Add spinner animation to style
+    if (!document.getElementById('spinnerStyle')) {
+      const style = document.createElement('style');
+      style.id = 'spinnerStyle';
+      style.textContent = `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  } else {
+    overlay.style.display = 'flex';
+    document.getElementById('loadingText').textContent = message;
+  }
+}
+
+/**
+ * Hide loading indicator
+ */
+function hideLoading() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
 async function loadState() {
   try {
     const response = await fetch('/api/state');
@@ -36,7 +122,7 @@ async function loadState() {
     }
   } catch (error) {
     console.error('Error loading state:', error);
-    alert('Error loading data');
+    alert('Error loading data: ' + error.message);
   }
 }
 
@@ -57,10 +143,14 @@ function renderManagers() {
     const capacity = state.managerCapacity[manager] || {};
     const total = monthNames.reduce((sum, month) => sum + (capacity[month] || 0), 0);
     
+    // Escape manager name for safe HTML insertion
+    const safeManagerName = manager.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    const displayManagerName = escapeHtml(manager);
+    
     return `
       <div class="manager-row">
         <div class="manager-name">
-          ${manager}
+          ${displayManagerName}
           <br>
           <small>Total: ${total} hrs/year</small>
         </div>
@@ -71,17 +161,30 @@ function renderManagers() {
               <input 
                 type="number" 
                 value="${capacity[month] || 100}"
-                data-manager="${manager}"
+                data-manager="${safeManagerName}"
                 data-month="${month}"
                 onchange="updateCapacity(this)"
+                min="0"
+                max="10000"
               >
             </div>
           `).join('')}
         </div>
-        <button class="btn" onclick="deleteManager('${manager}')" style="background:#f44336;color:white;margin-left:10px;">Delete</button>
+        <button class="btn" onclick="deleteManager('${safeManagerName}')" style="background:#f44336;color:white;margin-left:10px;">Delete</button>
       </div>
     `;
   }).join('');
+}
+
+/**
+ * Escape HTML special characters to prevent XSS
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 function renderAllocationBoard() {
@@ -112,11 +215,13 @@ function renderAllocationBoard() {
   state.managers.forEach(manager => {
     const clients = managerGroups[manager];
     const monthlyBreakdown = calculateMonthlyBreakdown(clients);
+    const safeManagerName = manager.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    const displayManagerName = escapeHtml(manager);
     
     html += `
-      <div class="column" data-manager="${manager}">
+      <div class="column" data-manager="${safeManagerName}">
         <div class="column-header">
-          <div class="column-title">${manager}</div>
+          <div class="column-title">${displayManagerName}</div>
           <div class="column-stats">${clients.length} clients, ${calculateTotal(clients)} hrs</div>
           <div class="column-stats" style="margin-top:5px;font-size:10px;">
             ${monthNames.map(month => `${month.substring(0,3)}: ${Math.round(monthlyBreakdown[month])}`).join(' | ')}
@@ -160,12 +265,15 @@ function renderCards(clients) {
       .map(([month, hours]) => `${month.substring(0,3)}: ${Math.round(hours)}`)
       .join(', ');
     
+    const safeGroupName = escapeHtml(groupName);
+    const clientList = groupClients.map(c => escapeHtml(c.Client)).join(', ');
+    
     html += `
       <div class="card group-card" draggable="true" data-group="${groupName}" data-client-id="${groupClients[0].id}">
-        <div class="card-title">📁 Group: ${groupName}</div>
+        <div class="card-title">📁 Group: ${safeGroupName}</div>
         <div class="card-detail">Total: ${Math.round(totalHours)} hrs</div>
         <div class="card-detail">${topMonths}</div>
-        <div class="group-members">${groupClients.length} clients: ${groupClients.map(c => c.Client).join(', ')}</div>
+        <div class="group-members">${groupClients.length} clients: ${clientList}</div>
       </div>
     `;
   });
@@ -178,10 +286,13 @@ function renderCards(clients) {
       .map(([month, hours]) => `${month.substring(0,3)}: ${Math.round(hours)}`)
       .join(', ');
     
+    const safeClientName = escapeHtml(client.Client);
+    const safePartnerName = escapeHtml(client.Partner);
+    
     html += `
       <div class="card" draggable="true" data-client-id="${client.id}">
-        <div class="card-title">${client.Client}</div>
-        <div class="card-detail">Partner: ${client.Partner}</div>
+        <div class="card-title">${safeClientName}</div>
+        <div class="card-detail">Partner: ${safePartnerName}</div>
         <div class="card-detail">Total: ${Math.round(client.Total)} hrs</div>
         <div class="card-detail">${topMonths}</div>
       </div>
@@ -262,12 +373,14 @@ async function moveClient(clientId, manager, skipRender = false) {
     }
   } catch (error) {
     console.error('Error moving client:', error);
-    alert('Error moving client');
+    alert('Error moving client: ' + error.message);
   }
 }
 
 async function moveGroup(groupName, manager) {
   const groupClients = state.clients.filter(c => c.Group === groupName);
+  
+  showLoading(`Moving ${groupClients.length} clients...`);
   
   try {
     // Make all API calls in parallel for better performance
@@ -281,7 +394,9 @@ async function moveGroup(groupName, manager) {
     await loadState();
   } catch (error) {
     console.error('Error moving group:', error);
-    alert('Error moving group');
+    alert('Error moving group: ' + error.message);
+  } finally {
+    hideLoading();
   }
 }
 
@@ -310,8 +425,21 @@ async function updateCapacity(input) {
   const month = input.dataset.month;
   const hours = parseFloat(input.value);
   
+  // Client-side validation
+  if (isNaN(hours) || hours < 0) {
+    alert('Capacity must be a non-negative number');
+    input.value = state.managerCapacity[manager][month] || 100;
+    return;
+  }
+  
+  if (hours > 10000) {
+    alert('Capacity cannot exceed 10,000 hours');
+    input.value = state.managerCapacity[manager][month] || 100;
+    return;
+  }
+  
   try {
-    const response = await fetch(`/api/managers/${manager}/capacity`, {
+    const response = await fetch(`/api/managers/${encodeURIComponent(manager)}/capacity`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ month, hours })
@@ -321,17 +449,27 @@ async function updateCapacity(input) {
     if (data.success) {
       state = data.state;
       renderManagers();
+    } else {
+      alert('Error: ' + data.error);
+      input.value = state.managerCapacity[manager][month] || 100;
     }
   } catch (error) {
     console.error('Error updating capacity:', error);
+    alert('Error updating capacity: ' + error.message);
+    input.value = state.managerCapacity[manager][month] || 100;
   }
 }
 
 async function deleteManager(manager) {
-  if (!confirm(`Delete manager ${manager}? Assigned clients will be unassigned.`)) return;
+  // Unescape the manager name
+  const actualManager = manager.replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+  
+  if (!confirm(`Delete manager ${actualManager}? Assigned clients will be unassigned.`)) return;
+  
+  showLoading('Deleting manager...');
   
   try {
-    const response = await fetch(`/api/managers/${manager}`, {
+    const response = await fetch(`/api/managers/${encodeURIComponent(actualManager)}`, {
       method: 'DELETE'
     });
     
@@ -339,9 +477,14 @@ async function deleteManager(manager) {
     if (data.success) {
       state = data.state;
       renderUI();
+    } else {
+      alert('Error: ' + data.error);
     }
   } catch (error) {
     console.error('Error deleting manager:', error);
+    alert('Error deleting manager: ' + error.message);
+  } finally {
+    hideLoading();
   }
 }
 
@@ -352,8 +495,25 @@ function handleImport() {
     const file = e.target.files[0];
     if (!file) return;
     
+    // Check if there are existing clients and warn user
+    if (state.clients.length > 0) {
+      const proceed = confirm(
+        `Warning: You currently have ${state.clients.length} clients loaded.\n\n` +
+        'Importing a new file will REPLACE all existing client data.\n\n' +
+        'Do you want to continue?'
+      );
+      
+      if (!proceed) {
+        // Reset file input so same file can be selected again
+        e.target.value = '';
+        return;
+      }
+    }
+    
     const formData = new FormData();
     formData.append('file', file);
+    
+    showLoading('Importing Excel file...');
     
     try {
       const response = await fetch('/api/import', {
@@ -371,7 +531,11 @@ function handleImport() {
       }
     } catch (error) {
       console.error('Error importing:', error);
-      alert('Error importing file');
+      alert('Error importing file: ' + error.message);
+    } finally {
+      // Reset file input so same file can be selected again
+      e.target.value = '';
+      hideLoading();
     }
   };
 }
@@ -383,16 +547,21 @@ function showAddManagerModal() {
   modalBody.innerHTML = `
     <div class="form-group">
       <label>Manager Name</label>
-      <input type="text" id="managerName" placeholder="Enter name">
+      <input type="text" id="managerName" placeholder="Enter name" maxlength="100">
     </div>
     <div class="form-group">
       <label>Default Monthly Capacity (hours)</label>
-      <input type="number" id="managerCapacity" value="100" placeholder="100">
+      <input type="number" id="managerCapacity" value="100" placeholder="100" min="0" max="10000">
     </div>
     <button class="btn btn-primary" onclick="addManager()">Add Manager</button>
   `;
   
   modal.style.display = 'block';
+  
+  // Focus on name input
+  setTimeout(() => {
+    document.getElementById('managerName').focus();
+  }, 100);
 }
 
 async function addManager() {
@@ -404,10 +573,22 @@ async function addManager() {
     return;
   }
   
+  if (isNaN(capacityValue) || capacityValue < 0) {
+    alert('Capacity must be a non-negative number');
+    return;
+  }
+  
+  if (capacityValue > 10000) {
+    alert('Capacity cannot exceed 10,000 hours');
+    return;
+  }
+  
   const capacity = {};
   monthNames.forEach(month => {
     capacity[month] = capacityValue;
   });
+  
+  showLoading('Adding manager...');
   
   try {
     const response = await fetch('/api/managers', {
@@ -426,7 +607,9 @@ async function addManager() {
     }
   } catch (error) {
     console.error('Error adding manager:', error);
-    alert('Error adding manager');
+    alert('Error adding manager: ' + error.message);
+  } finally {
+    hideLoading();
   }
 }
 
@@ -441,7 +624,9 @@ async function handleAllocate() {
     return;
   }
   
-  if (!confirm('Run automatic allocation? This will reassign all clients.')) return;
+  if (!confirm('Run automatic allocation? This will reassign all clients based on workload balancing.')) return;
+  
+  showLoading('Running allocation algorithm...');
   
   try {
     const response = await fetch('/api/allocate', {
@@ -458,7 +643,9 @@ async function handleAllocate() {
     }
   } catch (error) {
     console.error('Error allocating:', error);
-    alert('Error running allocation');
+    alert('Error running allocation: ' + error.message);
+  } finally {
+    hideLoading();
   }
 }
 
@@ -468,11 +655,19 @@ async function handleExport() {
     return;
   }
   
+  showLoading('Generating Excel file...');
+  
   try {
-    window.location.href = '/api/export';
+    // Use setTimeout to allow loading indicator to show
+    setTimeout(() => {
+      window.location.href = '/api/export';
+      // Hide loading after a delay
+      setTimeout(hideLoading, 2000);
+    }, 100);
   } catch (error) {
     console.error('Error exporting:', error);
-    alert('Error exporting file');
+    alert('Error exporting file: ' + error.message);
+    hideLoading();
   }
 }
 

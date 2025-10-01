@@ -32,9 +32,60 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedExts = ['.xlsx', '.xls'];
     const ext = path.extname(file.originalname).toLowerCase();
-    allowedExts.includes(ext) ? cb(null, true) : cb(new Error('Only Excel files'));
+    allowedExts.includes(ext) ? cb(null, true) : cb(new Error('Only Excel files allowed (.xlsx or .xls)'));
   }
 });
+
+/**
+ * Validate manager name format
+ * @param {string} name - Manager name to validate
+ * @throws {Error} If name is invalid
+ */
+function validateManagerName(name) {
+  if (!name || typeof name !== 'string') {
+    throw new Error('Manager name is required');
+  }
+  
+  const trimmedName = name.trim();
+  
+  if (trimmedName.length === 0) {
+    throw new Error('Manager name cannot be empty');
+  }
+  
+  if (trimmedName.length > 100) {
+    throw new Error('Manager name is too long (maximum 100 characters)');
+  }
+  
+  return trimmedName;
+}
+
+/**
+ * Validate capacity value
+ * @param {number} value - Capacity value to validate
+ * @param {string} fieldName - Name of field for error message
+ * @throws {Error} If value is invalid
+ */
+function validateCapacity(value, fieldName = 'Capacity') {
+  if (value === null || value === undefined) {
+    throw new Error(`${fieldName} is required`);
+  }
+  
+  const numValue = Number(value);
+  
+  if (isNaN(numValue)) {
+    throw new Error(`${fieldName} must be a valid number`);
+  }
+  
+  if (numValue < 0) {
+    throw new Error(`${fieldName} cannot be negative`);
+  }
+  
+  if (numValue > 10000) {
+    throw new Error(`${fieldName} is too large (maximum 10,000 hours)`);
+  }
+  
+  return numValue;
+}
 
 /**
  * GET /api/state
@@ -90,26 +141,48 @@ app.post('/api/managers', async (req, res, next) => {
   try {
     const { name, capacity } = req.body;
     
-    if (!name) {
-      throw new Error('Manager name required');
-    }
+    // Validate and sanitize manager name
+    const validatedName = validateManagerName(name);
     
     const state = await loadState();
     
-    // Check if manager already exists
-    if (state.managers.includes(name)) {
-      throw new Error('Manager already exists');
+    // Check if manager already exists (case-insensitive)
+    const existingManager = state.managers.find(
+      m => m.toLowerCase() === validatedName.toLowerCase()
+    );
+    
+    if (existingManager) {
+      throw new Error(`Manager "${existingManager}" already exists`);
+    }
+    
+    // Validate capacity if provided
+    let validatedCapacity;
+    if (capacity) {
+      validatedCapacity = {};
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      
+      monthNames.forEach(month => {
+        if (capacity[month] !== undefined) {
+          validatedCapacity[month] = validateCapacity(capacity[month], `${month} capacity`);
+        } else {
+          validatedCapacity[month] = 100; // Default
+        }
+      });
+    } else {
+      // Default 100 hours per month if not provided
+      validatedCapacity = {
+        January: 100, February: 100, March: 100, April: 100,
+        May: 100, June: 100, July: 100, August: 100,
+        September: 100, October: 100, November: 100, December: 100
+      };
     }
     
     // Add manager to list
-    state.managers.push(name);
-    
-    // Set capacity (default 100 hours per month if not provided)
-    state.managerCapacity[name] = capacity || {
-      January: 100, February: 100, March: 100, April: 100,
-      May: 100, June: 100, July: 100, August: 100,
-      September: 100, October: 100, November: 100, December: 100
-    };
+    state.managers.push(validatedName);
+    state.managerCapacity[validatedName] = validatedCapacity;
     
     await saveState(state);
     
@@ -127,7 +200,16 @@ app.delete('/api/managers/:name', async (req, res, next) => {
   try {
     const { name } = req.params;
     
+    if (!name) {
+      throw new Error('Manager name is required');
+    }
+    
     const state = await loadState();
+    
+    // Check if manager exists
+    if (!state.managers.includes(name)) {
+      throw new Error(`Manager "${name}" not found`);
+    }
     
     // Remove manager from list
     state.managers = state.managers.filter(m => m !== name);
@@ -160,24 +242,33 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
     const state = await loadState();
     
     if (!state.managers.includes(name)) {
-      throw new Error('Manager not found');
+      throw new Error(`Manager "${name}" not found`);
     }
+    
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
     
     // Update all months with the same value
     if (allMonths !== undefined) {
-      const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-      ];
+      const validatedHours = validateCapacity(allMonths, 'Monthly capacity');
+      
       monthNames.forEach(m => {
-        state.managerCapacity[name][m] = allMonths;
+        state.managerCapacity[name][m] = validatedHours;
       });
     } 
     // Update specific month
     else if (month && hours !== undefined) {
-      state.managerCapacity[name][month] = hours;
+      // Validate month name
+      if (!monthNames.includes(month)) {
+        throw new Error(`Invalid month: ${month}. Must be one of: ${monthNames.join(', ')}`);
+      }
+      
+      const validatedHours = validateCapacity(hours, `${month} capacity`);
+      state.managerCapacity[name][month] = validatedHours;
     } else {
-      throw new Error('Must provide either allMonths or month and hours');
+      throw new Error('Must provide either allMonths or both month and hours');
     }
     
     await saveState(state);
@@ -197,12 +288,23 @@ app.patch('/api/clients/:id', async (req, res, next) => {
     const { id } = req.params;
     const { Manager } = req.body;
     
+    if (!id) {
+      throw new Error('Client ID is required');
+    }
+    
     const state = await loadState();
     
     // Find the client
     const client = state.clients.find(c => c.id === id);
     if (!client) {
-      throw new Error('Client not found');
+      throw new Error(`Client not found with ID: ${id}`);
+    }
+    
+    // If assigning to a manager, validate manager exists
+    if (Manager && Manager !== '') {
+      if (!state.managers.includes(Manager)) {
+        throw new Error(`Manager "${Manager}" not found`);
+      }
     }
     
     // Update manager assignment
@@ -225,11 +327,11 @@ app.post('/api/allocate', async (req, res, next) => {
     const state = await loadState();
     
     if (state.managers.length === 0) {
-      throw new Error('No managers defined');
+      throw new Error('No managers defined. Please add at least one manager before running allocation.');
     }
     
     if (state.clients.length === 0) {
-      throw new Error('No clients to allocate');
+      throw new Error('No clients to allocate. Please import client data first.');
     }
     
     // Run the allocation algorithm
@@ -253,7 +355,7 @@ app.get('/api/export', async (req, res, next) => {
     const state = await loadState();
     
     if (state.clients.length === 0) {
-      throw new Error('No clients to export');
+      throw new Error('No clients to export. Please import client data first.');
     }
     
     // Create output directory if it doesn't exist
@@ -283,7 +385,20 @@ app.get('/api/export', async (req, res, next) => {
  */
 app.use((err, req, res, next) => {
   console.error('Error:', err.message);
-  res.status(err.status || 500).json({
+  
+  // Determine appropriate status code
+  let statusCode = 500;
+  if (err.message.includes('not found')) {
+    statusCode = 404;
+  } else if (err.message.includes('required') || 
+             err.message.includes('invalid') ||
+             err.message.includes('must be') ||
+             err.message.includes('cannot be') ||
+             err.message.includes('already exists')) {
+    statusCode = 400;
+  }
+  
+  res.status(statusCode).json({
     success: false,
     error: err.message || 'Internal server error'
   });

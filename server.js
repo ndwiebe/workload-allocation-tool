@@ -5,6 +5,7 @@ const fs = require('fs');
 const { importExcel } = require('./src/import');
 const { loadState, saveState } = require('./src/storage');
 const { allocate } = require('./src/allocate');
+const { exportToExcel } = require('./src/export');
 
 const app = express();
 const PORT = 3000;
@@ -229,6 +230,39 @@ app.post('/api/allocate', async (req, res, next) => {
     await saveState(state);
     
     res.json({ success: true, message: 'Allocation complete', state });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/export
+ * Export current allocation to Excel file
+ */
+app.get('/api/export', async (req, res, next) => {
+  try {
+    const state = await loadState();
+    
+    if (state.clients.length === 0) {
+      throw new Error('No clients to export');
+    }
+    
+    // Create output directory if it doesn't exist
+    const outputDir = path.join(__dirname, 'output');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    
+    // Generate the Excel file
+    const outputPath = path.join(outputDir, 'Master_List.xlsx');
+    exportToExcel(state, outputPath);
+    
+    // Send file for download
+    res.download(outputPath, 'Master_List.xlsx', (err) => {
+      if (err) {
+        next(err);
+      }
+    });
   } catch (error) {
     next(error);
   }

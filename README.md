@@ -17,13 +17,23 @@
    http://127.0.0.1:3000
    ```
 
+## Testing Stage 5 (Frontend Structure)
+
+The visual interface is now live! Start the server and visit http://127.0.0.1:3000
+
+**What you'll see:**
+- ✅ Header with 4 action buttons
+- ✅ Manager capacity section (empty until you add managers)
+- ✅ Allocation board (empty until you import clients)
+- ✅ Professional styling and layout
+
+**Note:** Buttons won't do anything yet - functionality comes in Stage 6!
+
+You can inspect the HTML structure and CSS styling. The interface is fully responsive and ready for interactivity.
+
 ## Testing Stage 4 (Allocation Algorithm)
 
 The allocation algorithm automatically assigns clients to managers in a balanced way.
-
-**Prerequisites:**
-- Have managers added
-- Have clients imported
 
 **Test with curl:**
 
@@ -31,63 +41,11 @@ The allocation algorithm automatically assigns clients to managers in a balanced
    ```bash
    curl -X POST http://127.0.0.1:3000/api/managers -H "Content-Type: application/json" -d '{"name":"Alice"}'
    curl -X POST http://127.0.0.1:3000/api/managers -H "Content-Type: application/json" -d '{"name":"Bob"}'
-   curl -X POST http://127.0.0.1:3000/api/managers -H "Content-Type: application/json" -d '{"name":"Carol"}'
    ```
 
-2. **Import an Excel file** (via Postman or browser once frontend is ready)
-
-3. **Run allocation:**
+2. **Run allocation:**
    ```bash
    curl -X POST http://127.0.0.1:3000/api/allocate
-   ```
-
-4. **Check results:**
-   ```bash
-   curl http://127.0.0.1:3000/api/state
-   ```
-
-You should see clients now have Manager assignments!
-
-**Test in Browser Console:**
-```javascript
-// Run allocation
-fetch('/api/allocate', { method: 'POST' })
-  .then(r => r.json())
-  .then(data => console.log(data));
-```
-
-## Testing Stage 3 (Backend API)
-
-Start the server and test API endpoints:
-
-```bash
-npm start
-```
-
-In another terminal or browser:
-
-1. **Test getting state:**
-   ```bash
-   curl http://127.0.0.1:3000/api/state
-   ```
-
-2. **Test adding a manager:**
-   ```bash
-   curl -X POST http://127.0.0.1:3000/api/managers \
-     -H "Content-Type: application/json" \
-     -d '{"name":"Alice"}'
-   ```
-
-3. **Open in browser:**
-   Visit `http://127.0.0.1:3000`
-
-## Testing Stage 2 (Excel Import)
-
-1. Place your Excel file in the project folder
-2. Update the filename in `test-import.js`
-3. Run the test:
-   ```bash
-   node test-import.js
    ```
 
 ## Usage
@@ -107,7 +65,10 @@ workload-allocation/
 │   ├── import.js      # Excel import logic
 │   ├── storage.js     # Data persistence
 │   └── allocate.js    # Allocation algorithm
-├── public/            # Frontend files (coming in Stage 5)
+├── public/
+│   ├── index.html     # Frontend structure
+│   ├── styles.css     # Professional styling
+│   └── app.js         # JavaScript (Stage 6)
 ├── data/              # Persistent storage (auto-created)
 ├── output/            # Exported Excel files
 ├── uploads/           # Temporary file uploads (auto-created)
@@ -132,6 +93,6 @@ workload-allocation/
 - ✅ Stage 2: Excel Import
 - ✅ Stage 3: Backend API & Storage
 - ✅ Stage 4: Allocation Algorithm
-- ⏳ Stage 5: Frontend Structure
-- ⏳ Stage 6: Frontend Logic
+- ✅ Stage 5: Frontend Structure (HTML & CSS)
+- ⏳ Stage 6: Frontend Logic (JavaScript & Drag-Drop)
 - ⏳ Stage 7: Excel Export

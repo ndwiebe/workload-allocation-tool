@@ -4,112 +4,40 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Workload Allocation Tool</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 50px auto;
-      padding: 20px;
-      background-color: #f5f5f5;
-    }
-    .container {
-      background: white;
-      padding: 40px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    h1 {
-      color: #333;
-    }
-    .status {
-      background-color: #4CAF50;
-      color: white;
-      padding: 15px;
-      border-radius: 4px;
-      margin: 20px 0;
-    }
-    .coming-soon {
-      background-color: #FF9800;
-      color: white;
-      padding: 15px;
-      border-radius: 4px;
-      margin: 20px 0;
-    }
-    .stages {
-      margin-top: 30px;
-    }
-    .stage {
-      padding: 10px;
-      margin: 5px 0;
-      border-left: 4px solid #4CAF50;
-      background-color: #f9f9f9;
-    }
-    .stage.pending {
-      border-left-color: #ccc;
-      opacity: 0.6;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="container">
-    <h1>🚀 Workload Allocation Tool</h1>
-    
-    <div class="status">
-      <strong>✅ Backend is complete!</strong>
-      <p>All core functionality is working: Import, Storage, and Allocation Algorithm.</p>
-    </div>
-    
-    <div class="coming-soon">
-      <strong>⏳ User Interface Coming Soon</strong>
-      <p>The visual interface will be built in Stages 5 & 6 (next up!).</p>
-    </div>
-    
-    <h2>Development Progress</h2>
-    <div class="stages">
-      <div class="stage">✅ Stage 1: Project Setup</div>
-      <div class="stage">✅ Stage 2: Excel Import Module</div>
-      <div class="stage">✅ Stage 3: Backend API & Storage</div>
-      <div class="stage">✅ Stage 4: Allocation Algorithm</div>
-      <div class="stage pending">⏳ Stage 5: Frontend Structure (HTML & CSS)</div>
-      <div class="stage pending">⏳ Stage 6: Frontend Logic (JavaScript & Drag-Drop)</div>
-      <div class="stage pending">⏳ Stage 7: Excel Export</div>
-    </div>
-    
-    <h2>What's Working Now</h2>
-    <ul>
-      <li>✅ Excel file import and parsing</li>
-      <li>✅ Manager creation and capacity management</li>
-      <li>✅ Data persistence (saves to JSON file)</li>
-      <li>✅ Smart allocation algorithm (balances workload)</li>
-      <li>✅ Full REST API for all operations</li>
-    </ul>
-    
-    <h2>Test the Allocation</h2>
-    <p>Open your browser console (F12) and try:</p>
-    
-    <h3>1. Check current state:</h3>
-    <pre style="background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto;">
-fetch('/api/state')
-  .then(r => r.json())
-  .then(data => console.log(data));</pre>
-    
-    <h3>2. Add managers:</h3>
-    <pre style="background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto;">
-fetch('/api/managers', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ name: 'Alice' })
-}).then(r => r.json()).then(console.log);</pre>
+    <header>
+      <h1>Workload Allocation Tool</h1>
+      <div class="action-bar">
+        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+        <button id="importBtn" class="btn btn-primary">Import Excel</button>
+        <button id="addManagerBtn" class="btn btn-secondary">Add Manager</button>
+        <button id="allocateBtn" class="btn btn-success">Run Allocation</button>
+        <button id="exportBtn" class="btn btn-info">Export to Excel</button>
+      </div>
+    </header>
 
-    <h3>3. Run allocation (after importing clients):</h3>
-    <pre style="background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto;">
-fetch('/api/allocate', { method: 'POST' })
-  .then(r => r.json())
-  .then(data => console.log(data));</pre>
-    
-    <p style="margin-top: 30px; color: #666;">
-      <strong>Next:</strong> We'll build the visual interface so you can click buttons instead of typing commands!
-    </p>
+    <section class="manager-capacity">
+      <h2>Manager Capacity (hours per month)</h2>
+      <div id="managerList"></div>
+    </section>
+
+    <section class="allocation-board">
+      <h2>Allocation Board</h2>
+      <div id="columns" class="columns"></div>
+    </section>
   </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2 id="modalTitle">Add Manager</h2>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>

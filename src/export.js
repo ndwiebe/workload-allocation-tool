@@ -1,6 +1,6 @@
 const XLSX = require('xlsx');
 const path = require('path');
-const { monthNames } = require('./constants');
+const { MONTH_NAMES } = require('./constants');
 
 /**
  * Export state to Excel file with 3 sheets
@@ -88,7 +88,7 @@ function createManagerTimeByMonthSheet(clients, managers) {
     let totalHours = 0;
     
     // Sum up hours for each month
-    monthNames.forEach(month => {
+    MONTH_NAMES.forEach(month => {
       const monthTotal = managerClients.reduce((sum, client) => {
         return sum + (client.months[month] || 0);
       }, 0);
@@ -108,7 +108,7 @@ function createManagerTimeByMonthSheet(clients, managers) {
   
   let grandTotal = 0;
   
-  monthNames.forEach(month => {
+  MONTH_NAMES.forEach(month => {
     const monthGrandTotal = clients.reduce((sum, client) => {
       return sum + (client.months[month] || 0);
     }, 0);
@@ -173,7 +173,7 @@ function createManagerTimeByPartnerSheet(clients, managers) {
       
       let totalHours = 0;
       
-      monthNames.forEach(month => {
+      MONTH_NAMES.forEach(month => {
         const monthTotal = partnerClients.reduce((sum, client) => {
           return sum + (client.months[month] || 0);
         }, 0);
@@ -194,7 +194,7 @@ function createManagerTimeByPartnerSheet(clients, managers) {
   
   let grandTotal = 0;
   
-  monthNames.forEach(month => {
+  MONTH_NAMES.forEach(month => {
     const monthGrandTotal = clients.reduce((sum, client) => {
       return sum + (client.months[month] || 0);
     }, 0);

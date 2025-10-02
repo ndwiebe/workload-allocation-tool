@@ -35,6 +35,27 @@ function setupEventListeners() {
   
   // Search functionality
   document.getElementById('searchBox').addEventListener('input', handleSearch);
+  
+  // Event delegation for group toggle (SECURITY FIX - Bug #3)
+  document.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-action="toggle-group"]');
+    if (row) {
+      const groupName = row.getAttribute('data-group-name');
+      toggleGroup(groupName);
+    }
+  });
+  
+  // Handle keyboard navigation for accessibility (Bug #3)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const row = e.target.closest('[data-action="toggle-group"]');
+      if (row) {
+        e.preventDefault();
+        const groupName = row.getAttribute('data-group-name');
+        toggleGroup(groupName);
+      }
+    }
+  });
 }
 
 /**
@@ -448,7 +469,7 @@ function renderTable() {
   
   let html = '';
   
-  // Render groups
+  // Render groups (SECURITY FIX - Bug #3: Use event delegation instead of inline onclick)
   Object.keys(groups).sort().forEach(groupName => {
     const groupClients = groups[groupName];
     const isLocked = groupClients.some(c => c.locked);
@@ -460,11 +481,11 @@ function renderTable() {
     const groupMonthlyHours = calculateGroupMonthlyHours(groupClients);
     const groupTotal = monthNames.reduce((sum, month) => sum + groupMonthlyHours[month], 0);
     
-    // Group header row with collapse/expand functionality
+    // Group header row - using data attributes for event delegation (Bug #3 fix)
     html += `
       <tr class="group-header ${isLocked ? 'locked-row' : ''} ${isCollapsed ? 'collapsed' : 'expanded'}" 
-          onclick="toggleGroup('${escapeHtml(groupName).replace(/'/g, "\\'")}')"
-          onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleGroup('${escapeHtml(groupName).replace(/'/g, "\\'")}')); }"
+          data-group-name="${escapeHtml(groupName)}"
+          data-action="toggle-group"
           tabindex="0"
           role="button"
           aria-expanded="${!isCollapsed}"
@@ -514,7 +535,7 @@ function renderClientRow(client, isInGroup) {
       </td>
       <td>${escapeHtml(client.Partner)}</td>
       <td>
-        <select class="manager-select" onchange="updateClientManager('${client.id}', this.value)" ${client.locked ? '' : ''}>
+        <select class="manager-select" onchange="updateClientManager('${client.id}', this.value)" ${client.locked ? 'disabled' : ''}>
           <option value="">Unassigned</option>
           ${state.managers.map(m => `
             <option value="${escapeHtml(m)}" ${client.Manager === m ? 'selected' : ''}>
@@ -866,28 +887,32 @@ function editManagerCapacity(manager) {
 }
 
 /**
- * Save manager capacity
+ * Save manager capacity (Bug #5 FIX: Validate ALL inputs before making ANY changes)
  * @param {string} manager - Manager name
  */
 async function saveManagerCapacity(manager) {
   const capacity = {};
-  let hasError = false;
+  const errors = [];
   
-  monthNames.forEach(month => {
+  // VALIDATE ALL INPUTS FIRST (Bug #5 fix)
+  for (const month of monthNames) {
     const input = document.getElementById(`capacity-${month}`);
     const value = parseFloat(input.value);
     
     if (isNaN(value) || value < 0) {
-      alert(`Invalid capacity for ${month}`);
-      hasError = true;
-      return;
+      errors.push(`Invalid capacity for ${month}`);
+    } else {
+      capacity[month] = value;
     }
-    
-    capacity[month] = value;
-  });
+  }
   
-  if (hasError) return;
+  // If ANY validation fails, show ALL errors and abort
+  if (errors.length > 0) {
+    alert('Validation errors:\n\n' + errors.join('\n'));
+    return;
+  }
   
+  // All validations passed - proceed with save
   showLoading('Saving capacity...');
   
   try {

@@ -62,6 +62,19 @@ function validateManagerName(name) {
 }
 
 /**
+ * Find manager by name (case-insensitive)
+ * BUG #4 FIX: Centralized case-insensitive manager lookup
+ * @param {Array<string>} managers - Array of manager names
+ * @param {string} name - Name to search for
+ * @returns {string|null} Exact manager name if found, null otherwise
+ */
+function findManager(managers, name) {
+  if (!name) return null;
+  const normalized = name.toLowerCase();
+  return managers.find(m => m.toLowerCase() === normalized) || null;
+}
+
+/**
  * Validate capacity value
  * @param {number} value - Capacity value to validate
  * @param {string} fieldName - Name of field for error message
@@ -182,6 +195,7 @@ app.post('/api/preferences/import', upload.single('file'), async (req, res, next
 /**
  * POST /api/managers
  * Add a new manager
+ * BUG #4 FIX: Use case-insensitive duplicate check with helper function
  */
 app.post('/api/managers', async (req, res, next) => {
   try {
@@ -192,13 +206,15 @@ app.post('/api/managers', async (req, res, next) => {
     
     const state = await loadState();
     
-    // Check if manager already exists (case-insensitive)
-    const existingManager = state.managers.find(
-      m => m.toLowerCase() === validatedName.toLowerCase()
-    );
+    // BUG #4 FIX: Use centralized case-insensitive lookup
+    const existingManager = findManager(state.managers, validatedName);
     
     if (existingManager) {
-      throw new Error(`Manager "${existingManager}" already exists`);
+      // Return the exact existing manager name with better error message
+      throw new Error(
+        `Manager already exists as "${existingManager}". ` +
+        `Manager names are case-insensitive (e.g., "Alice" and "alice" are considered the same).`
+      );
     }
     
     // Validate capacity if provided
@@ -218,7 +234,7 @@ app.post('/api/managers', async (req, res, next) => {
       validatedCapacity = createMonthObject(100);
     }
     
-    // Add manager to list
+    // Add manager to list (preserving user's exact casing for display)
     state.managers.push(validatedName);
     state.managerCapacity[validatedName] = validatedCapacity;
     
@@ -233,6 +249,7 @@ app.post('/api/managers', async (req, res, next) => {
 /**
  * DELETE /api/managers/:name
  * Delete a manager
+ * BUG #4 FIX: Use case-insensitive manager lookup
  */
 app.delete('/api/managers/:name', async (req, res, next) => {
   try {
@@ -244,18 +261,20 @@ app.delete('/api/managers/:name', async (req, res, next) => {
     
     const state = await loadState();
     
-    // Check if manager exists
-    if (!state.managers.includes(name)) {
+    // BUG #4 FIX: Use centralized case-insensitive lookup
+    const exactManagerName = findManager(state.managers, name);
+    
+    if (!exactManagerName) {
       throw new Error(`Manager "${name}" not found`);
     }
     
-    // Remove manager from list
-    state.managers = state.managers.filter(m => m !== name);
-    delete state.managerCapacity[name];
+    // Remove manager from list using exact name
+    state.managers = state.managers.filter(m => m !== exactManagerName);
+    delete state.managerCapacity[exactManagerName];
     
-    // Unassign clients from this manager
+    // Unassign clients from this manager (case-insensitive comparison)
     state.clients.forEach(client => {
-      if (client.Manager === name) {
+      if (client.Manager && client.Manager.toLowerCase() === exactManagerName.toLowerCase()) {
         client.Manager = '';
       }
     });
@@ -271,6 +290,7 @@ app.delete('/api/managers/:name', async (req, res, next) => {
 /**
  * PUT /api/managers/:name/capacity
  * Update manager capacity
+ * BUG #4 FIX: Use case-insensitive manager lookup
  */
 app.put('/api/managers/:name/capacity', async (req, res, next) => {
   try {
@@ -279,16 +299,19 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
     
     const state = await loadState();
     
-    if (!state.managers.includes(name)) {
+    // BUG #4 FIX: Use centralized case-insensitive lookup
+    const exactManagerName = findManager(state.managers, name);
+    
+    if (!exactManagerName) {
       throw new Error(`Manager "${name}" not found`);
     }
     
-    // Handle capacity object from frontend settings modal (FIX #3)
+    // Handle capacity object from frontend settings modal
     if (capacity) {
       MONTH_NAMES.forEach(m => {
         if (capacity[m] !== undefined) {
           const validatedHours = validateCapacity(capacity[m], `${m} capacity`);
-          state.managerCapacity[name][m] = validatedHours;
+          state.managerCapacity[exactManagerName][m] = validatedHours;
         }
       });
     }
@@ -297,7 +320,7 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
       const validatedHours = validateCapacity(allMonths, 'Monthly capacity');
       
       MONTH_NAMES.forEach(m => {
-        state.managerCapacity[name][m] = validatedHours;
+        state.managerCapacity[exactManagerName][m] = validatedHours;
       });
     } 
     // Update specific month
@@ -308,7 +331,7 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
       }
       
       const validatedHours = validateCapacity(hours, `${month} capacity`);
-      state.managerCapacity[name][month] = validatedHours;
+      state.managerCapacity[exactManagerName][month] = validatedHours;
     } else {
       throw new Error('Must provide either capacity object, allMonths, or both month and hours');
     }
@@ -324,6 +347,7 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
 /**
  * PATCH /api/clients/:id
  * Update client assignment (e.g., change manager)
+ * BUG #4 FIX: Use case-insensitive manager validation
  */
 app.patch('/api/clients/:id', async (req, res, next) => {
   try {
@@ -342,15 +366,20 @@ app.patch('/api/clients/:id', async (req, res, next) => {
       throw new Error(`Client not found with ID: ${id}`);
     }
     
-    // If assigning to a manager, validate manager exists
+    // If assigning to a manager, validate manager exists (case-insensitive)
     if (Manager && Manager !== '') {
-      if (!state.managers.includes(Manager)) {
+      // BUG #4 FIX: Use centralized case-insensitive lookup
+      const exactManagerName = findManager(state.managers, Manager);
+      
+      if (!exactManagerName) {
         throw new Error(`Manager "${Manager}" not found`);
       }
+      
+      // Use the exact manager name from storage (preserves casing consistency)
+      client.Manager = exactManagerName;
+    } else {
+      client.Manager = '';
     }
-    
-    // Update manager assignment
-    client.Manager = Manager || '';
     
     await saveState(state);
     
@@ -388,7 +417,7 @@ app.patch('/api/clients/:id/lock', async (req, res, next) => {
 
 /**
  * POST /api/clients/:id/unlock
- * Unlock a client (FIX #2)
+ * Unlock a client
  */
 app.post('/api/clients/:id/unlock', async (req, res, next) => {
   try {

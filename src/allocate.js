@@ -1,3 +1,5 @@
+const { monthNames } = require('./constants');
+
 /**
  * Allocate clients to managers with workload balancing
  * @param {Array} managers - Array of manager names
@@ -6,11 +8,6 @@
  * @returns {Array} Updated clients array with manager assignments
  */
 function allocate(managers, clients, capacities) {
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
   const targets = calculateMonthlyTargets(clients, managers.length);
   
   const loads = {};
@@ -80,11 +77,6 @@ function allocate(managers, clients, capacities) {
  * @returns {Object} Target hours per month
  */
 function calculateMonthlyTargets(clients, managerCount) {
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
   const totals = {
     January: 0, February: 0, March: 0, April: 0,
     May: 0, June: 0, July: 0, August: 0,
@@ -111,11 +103,6 @@ function calculateMonthlyTargets(clients, managerCount) {
  * @returns {Object} Aggregated monthly hours
  */
 function aggregateMonthlyHours(clients) {
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
   const totals = {
     January: 0, February: 0, March: 0, April: 0,
     May: 0, June: 0, July: 0, August: 0,
@@ -141,11 +128,6 @@ function aggregateMonthlyHours(clients) {
  * @returns {string} Best manager name
  */
 function findBestManager(monthlyHours, managers, loads, targets, capacities) {
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
   let bestManager = null;
   let lowestCost = Infinity;
   let lowestTotalLoad = Infinity;
@@ -207,11 +189,6 @@ function findBestManager(monthlyHours, managers, loads, targets, capacities) {
  * @param {Object} monthlyHours - Hours to add
  */
 function updateLoads(loads, manager, monthlyHours) {
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
   monthNames.forEach(month => {
     loads[manager][month] += monthlyHours[month] || 0;
   });

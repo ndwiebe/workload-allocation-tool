@@ -1,5 +1,6 @@
 const XLSX = require('xlsx');
 const { v4: uuidv4 } = require('uuid');
+const { monthNames } = require('./constants');
 
 /**
  * Import Excel file and convert to internal client format
@@ -106,11 +107,6 @@ function findHeaderRow(worksheet) {
  * @returns {string} Month name
  */
 function parseWIPDate(wipDate, yearEnd) {
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
   if (!wipDate) {
     const monthIndex = (yearEnd + 1) % 12;
     return monthNames[monthIndex];

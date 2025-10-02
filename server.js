@@ -7,6 +7,7 @@ const { loadState, saveState } = require('./src/storage');
 const { allocate } = require('./src/allocate');
 const { exportToExcel } = require('./src/export');
 const { importPartnerPreferences, applyPartnerPreferences } = require('./src/partner-preferences');
+const { MONTH_NAMES, createMonthObject } = require('./src/constants');
 
 const app = express();
 const PORT = 3000;
@@ -204,12 +205,8 @@ app.post('/api/managers', async (req, res, next) => {
     let validatedCapacity;
     if (capacity) {
       validatedCapacity = {};
-      const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-      ];
       
-      monthNames.forEach(month => {
+      MONTH_NAMES.forEach(month => {
         if (capacity[month] !== undefined) {
           validatedCapacity[month] = validateCapacity(capacity[month], `${month} capacity`);
         } else {
@@ -218,11 +215,7 @@ app.post('/api/managers', async (req, res, next) => {
       });
     } else {
       // Default 100 hours per month if not provided
-      validatedCapacity = {
-        January: 100, February: 100, March: 100, April: 100,
-        May: 100, June: 100, July: 100, August: 100,
-        September: 100, October: 100, November: 100, December: 100
-      };
+      validatedCapacity = createMonthObject(100);
     }
     
     // Add manager to list
@@ -290,14 +283,9 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
       throw new Error(`Manager "${name}" not found`);
     }
     
-    const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
     // Handle capacity object from frontend settings modal (FIX #3)
     if (capacity) {
-      monthNames.forEach(m => {
+      MONTH_NAMES.forEach(m => {
         if (capacity[m] !== undefined) {
           const validatedHours = validateCapacity(capacity[m], `${m} capacity`);
           state.managerCapacity[name][m] = validatedHours;
@@ -308,15 +296,15 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
     else if (allMonths !== undefined) {
       const validatedHours = validateCapacity(allMonths, 'Monthly capacity');
       
-      monthNames.forEach(m => {
+      MONTH_NAMES.forEach(m => {
         state.managerCapacity[name][m] = validatedHours;
       });
     } 
     // Update specific month
     else if (month && hours !== undefined) {
       // Validate month name
-      if (!monthNames.includes(month)) {
-        throw new Error(`Invalid month: ${month}. Must be one of: ${monthNames.join(', ')}`);
+      if (!MONTH_NAMES.includes(month)) {
+        throw new Error(`Invalid month: ${month}. Must be one of: ${MONTH_NAMES.join(', ')}`);
       }
       
       const validatedHours = validateCapacity(hours, `${month} capacity`);

@@ -135,10 +135,10 @@ app.post('/api/import', upload.single('file'), async (req, res, next) => {
 });
 
 /**
- * POST /api/import-preferences
+ * POST /api/preferences/import
  * Import partner preferences Excel file and lock clients
  */
-app.post('/api/import-preferences', upload.single('file'), async (req, res, next) => {
+app.post('/api/preferences/import', upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {
       throw new Error('No file uploaded');
@@ -282,7 +282,7 @@ app.delete('/api/managers/:name', async (req, res, next) => {
 app.put('/api/managers/:name/capacity', async (req, res, next) => {
   try {
     const { name } = req.params;
-    const { month, hours, allMonths } = req.body;
+    const { month, hours, allMonths, capacity } = req.body;
     
     const state = await loadState();
     
@@ -295,8 +295,17 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
     
+    // Handle capacity object from frontend settings modal (FIX #3)
+    if (capacity) {
+      monthNames.forEach(m => {
+        if (capacity[m] !== undefined) {
+          const validatedHours = validateCapacity(capacity[m], `${m} capacity`);
+          state.managerCapacity[name][m] = validatedHours;
+        }
+      });
+    }
     // Update all months with the same value
-    if (allMonths !== undefined) {
+    else if (allMonths !== undefined) {
       const validatedHours = validateCapacity(allMonths, 'Monthly capacity');
       
       monthNames.forEach(m => {
@@ -313,7 +322,7 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
       const validatedHours = validateCapacity(hours, `${month} capacity`);
       state.managerCapacity[name][month] = validatedHours;
     } else {
-      throw new Error('Must provide either allMonths or both month and hours');
+      throw new Error('Must provide either capacity object, allMonths, or both month and hours');
     }
     
     await saveState(state);
@@ -380,6 +389,31 @@ app.patch('/api/clients/:id/lock', async (req, res, next) => {
     }
     
     client.locked = locked === true;
+    
+    await saveState(state);
+    
+    res.json({ success: true, state });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/clients/:id/unlock
+ * Unlock a client (FIX #2)
+ */
+app.post('/api/clients/:id/unlock', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const state = await loadState();
+    
+    const client = state.clients.find(c => c.id === id);
+    if (!client) {
+      throw new Error('Client not found');
+    }
+    
+    client.locked = false;
     
     await saveState(state);
     

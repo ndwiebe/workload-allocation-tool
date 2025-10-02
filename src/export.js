@@ -1,10 +1,6 @@
 const XLSX = require('xlsx');
 const path = require('path');
-
-const monthNames = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
+const { monthNames } = require('./constants');
 
 /**
  * Export state to Excel file with 3 sheets

@@ -6,6 +6,7 @@ const { importExcel } = require('./src/import');
 const { loadState, saveState } = require('./src/storage');
 const { allocate } = require('./src/allocate');
 const { exportToExcel } = require('./src/export');
+const { importPartnerPreferences, applyPartnerPreferences } = require('./src/partner-preferences');
 
 const app = express();
 const PORT = 3000;
@@ -124,6 +125,50 @@ app.post('/api/import', upload.single('file'), async (req, res, next) => {
     res.json({ success: true, message: `Imported ${clients.length} clients`, state });
   } catch (error) {
     // Clean up uploaded file if error occurs
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {}
+    }
+    next(error);
+  }
+});
+
+/**
+ * POST /api/import-preferences
+ * Import partner preferences Excel file and lock clients
+ */
+app.post('/api/import-preferences', upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      throw new Error('No file uploaded');
+    }
+    
+    const state = await loadState();
+    
+    if (state.clients.length === 0) {
+      throw new Error('Please import workload data first');
+    }
+    
+    if (state.managers.length === 0) {
+      throw new Error('Please add managers first');
+    }
+    
+    const preferences = importPartnerPreferences(req.file.path);
+    
+    fs.unlinkSync(req.file.path);
+    
+    const results = applyPartnerPreferences(state.clients, preferences, state.managers);
+    
+    await saveState(state);
+    
+    res.json({ 
+      success: true, 
+      message: `Locked ${results.matched} clients`,
+      results,
+      state 
+    });
+  } catch (error) {
     if (req.file) {
       try {
         fs.unlinkSync(req.file.path);
@@ -309,6 +354,32 @@ app.patch('/api/clients/:id', async (req, res, next) => {
     
     // Update manager assignment
     client.Manager = Manager || '';
+    
+    await saveState(state);
+    
+    res.json({ success: true, state });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/clients/:id/lock
+ * Lock or unlock a client
+ */
+app.patch('/api/clients/:id/lock', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { locked } = req.body;
+    
+    const state = await loadState();
+    
+    const client = state.clients.find(c => c.id === id);
+    if (!client) {
+      throw new Error('Client not found');
+    }
+    
+    client.locked = locked === true;
     
     await saveState(state);
     

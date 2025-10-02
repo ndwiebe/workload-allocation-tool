@@ -102,20 +102,36 @@ function findHeaderRow(worksheet) {
 
 /**
  * Parse WIP date to determine month
+ * FIXED: Corrected modulo arithmetic for fiscal year end calculation
+ * 
  * @param {string|Date} wipDate - WIP date value
- * @param {number} yearEnd - Fiscal year end month
+ * @param {number} yearEnd - Fiscal year end month (1-12)
  * @returns {string} Month name
+ * 
+ * @example
+ * // December year-end (12) should map to January (month after FYE)
+ * parseWIPDate(null, 12) // Returns 'January' (index 0)
+ * 
+ * @example
+ * // January year-end (1) should map to February
+ * parseWIPDate(null, 1) // Returns 'February' (index 1)
  */
 function parseWIPDate(wipDate, yearEnd) {
   if (!wipDate) {
-    const monthIndex = (yearEnd + 1) % 12;
+    // FIXED: Correct modulo arithmetic
+    // yearEnd % 12 correctly maps:
+    //   12 (Dec) -> 0 (Jan)
+    //   1 (Jan) -> 1 (Feb)
+    //   etc.
+    const monthIndex = yearEnd % 12;
     return MONTH_NAMES[monthIndex];
   }
   
   const date = wipDate instanceof Date ? wipDate : new Date(wipDate);
   
   if (isNaN(date.getTime())) {
-    const monthIndex = (yearEnd + 1) % 12;
+    // Fallback to yearEnd calculation
+    const monthIndex = yearEnd % 12;
     return MONTH_NAMES[monthIndex];
   }
   

@@ -7,6 +7,9 @@ let state = {
 // Track which groups are collapsed (default: all collapsed)
 let collapsedGroups = new Set();
 
+// Track if manager overview panel is collapsed (default: collapsed)
+let managerOverviewCollapsed = true;
+
 const monthNames = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -146,7 +149,7 @@ async function loadState() {
 }
 
 function renderUI() {
-  renderMetrics();
+  renderManagerOverview();
   renderTable();
   
   // Update import preferences button state
@@ -154,45 +157,229 @@ function renderUI() {
 }
 
 /**
- * Render metrics dashboard
+ * Toggle manager overview panel collapse/expand
  */
-function renderMetrics() {
-  const metricsGrid = document.getElementById('metricsGrid');
+function toggleManagerOverview() {
+  managerOverviewCollapsed = !managerOverviewCollapsed;
+  renderManagerOverview();
+}
+
+/**
+ * Calculate manager workloads by month
+ * @returns {Object} Object with manager workloads and unassigned hours
+ */
+function calculateManagerWorkloads() {
+  const workloads = {};
+  const unassigned = {};
   
-  const totalClients = state.clients.length;
-  const lockedClients = state.clients.filter(c => c.locked).length;
-  const unlockedClients = totalClients - lockedClients;
-  const totalManagers = state.managers.length;
+  // Initialize
+  state.managers.forEach(manager => {
+    workloads[manager] = {};
+    monthNames.forEach(month => {
+      workloads[manager][month] = 0;
+    });
+  });
   
-  metricsGrid.innerHTML = `
-    <div class="metric-card">
-      <div class="metric-label">Total Clients</div>
-      <div class="metric-value">${totalClients}</div>
-      <div class="metric-change neutral">All imported clients</div>
-    </div>
-    
-    <div class="metric-card">
-      <div class="metric-label">Locked Clients</div>
-      <div class="metric-value">${lockedClients}</div>
-      <div class="metric-change ${lockedClients > 0 ? 'positive' : 'neutral'}">
-        🔒 Fixed assignments
+  monthNames.forEach(month => {
+    unassigned[month] = 0;
+  });
+  
+  // Calculate workloads
+  state.clients.forEach(client => {
+    monthNames.forEach(month => {
+      const hours = client.months[month] || 0;
+      if (client.Manager && state.managers.includes(client.Manager)) {
+        workloads[client.Manager][month] += hours;
+      } else {
+        unassigned[month] += hours;
+      }
+    });
+  });
+  
+  return { workloads, unassigned };
+}
+
+/**
+ * Get capacity status color class
+ * @param {number} allocated - Allocated hours
+ * @param {number} capacity - Capacity hours
+ * @returns {string} CSS class name
+ */
+function getCapacityColorClass(allocated, capacity) {
+  if (capacity === 0) return 'capacity-unknown';
+  const percentage = (allocated / capacity) * 100;
+  if (percentage < 80) return 'capacity-good';
+  if (percentage <= 100) return 'capacity-warning';
+  return 'capacity-over';
+}
+
+/**
+ * Render manager overview panel
+ */
+function renderManagerOverview() {
+  const overviewSection = document.getElementById('metricsGrid');
+  
+  if (state.clients.length === 0 || state.managers.length === 0) {
+    overviewSection.innerHTML = `
+      <div class="manager-overview-collapsed" 
+           onclick="toggleManagerOverview()"
+           onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleManagerOverview(); }"
+           tabindex="0"
+           role="button"
+           aria-expanded="false">
+        <div class="overview-header">
+          <div class="overview-title">
+            <span class="expand-icon">▶</span>
+            📊 Manager Workload Overview
+          </div>
+        </div>
+        <div class="overview-summary">
+          ${state.managers.length === 0 ? 'No managers added yet' : 'No clients imported yet'}
+        </div>
       </div>
-    </div>
-    
-    <div class="metric-card">
-      <div class="metric-label">Unlocked Clients</div>
-      <div class="metric-value">${unlockedClients}</div>
-      <div class="metric-change ${unlockedClients > 0 ? 'positive' : 'neutral'}">
-        Available for allocation
+    `;
+    return;
+  }
+  
+  const { workloads, unassigned } = calculateManagerWorkloads();
+  
+  // Calculate totals
+  let totalAllocated = 0;
+  let totalUnassigned = 0;
+  const managerTotals = {};
+  
+  state.managers.forEach(manager => {
+    managerTotals[manager] = monthNames.reduce((sum, month) => {
+      return sum + workloads[manager][month];
+    }, 0);
+    totalAllocated += managerTotals[manager];
+  });
+  
+  totalUnassigned = monthNames.reduce((sum, month) => sum + unassigned[month], 0);
+  
+  const grandTotal = totalAllocated + totalUnassigned;
+  
+  if (managerOverviewCollapsed) {
+    overviewSection.innerHTML = `
+      <div class="manager-overview-collapsed" 
+           onclick="toggleManagerOverview()"
+           onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleManagerOverview(); }"
+           tabindex="0"
+           role="button"
+           aria-expanded="false"
+           aria-label="Expand manager workload overview">
+        <div class="overview-header">
+          <div class="overview-title">
+            <span class="expand-icon">▶</span>
+            📊 Manager Workload Overview
+          </div>
+          <div class="expand-hint">Click to expand</div>
+        </div>
+        <div class="overview-summary">
+          ${state.managers.length} Managers • ${Math.round(grandTotal).toLocaleString()} total hours • 
+          ${totalUnassigned > 0 ? `<span class="unassigned-badge">${Math.round(totalUnassigned).toLocaleString()} unassigned</span>` : 'All work assigned'}
+        </div>
       </div>
-    </div>
+    `;
+  } else {
+    let html = `
+      <div class="manager-overview-expanded">
+        <div class="overview-header" 
+             onclick="toggleManagerOverview()"
+             onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleManagerOverview(); }"
+             tabindex="0"
+             role="button"
+             aria-expanded="true"
+             aria-label="Collapse manager workload overview">
+          <div class="overview-title">
+            <span class="expand-icon">▼</span>
+            📊 Manager Workload Overview
+          </div>
+          <div class="expand-hint">Click to collapse</div>
+        </div>
+        
+        <div class="overview-table-container">
+          <table class="overview-table">
+            <thead>
+              <tr>
+                <th class="manager-col">Manager</th>
+                ${monthNames.map(month => `<th class="month-col">${month.substring(0, 3)}</th>`).join('')}
+                <th class="total-col">Total</th>
+                <th class="capacity-col">Capacity</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
     
-    <div class="metric-card">
-      <div class="metric-label">Active Managers</div>
-      <div class="metric-value">${totalManagers}</div>
-      <div class="metric-change neutral">Managing workload</div>
-    </div>
-  `;
+    // Manager rows
+    state.managers.forEach(manager => {
+      const capacity = state.managerCapacity[manager] || {};
+      const totalCapacity = monthNames.reduce((sum, month) => sum + (capacity[month] || 0), 0);
+      const allocated = managerTotals[manager];
+      const colorClass = getCapacityColorClass(allocated, totalCapacity);
+      const percentage = totalCapacity > 0 ? Math.round((allocated / totalCapacity) * 100) : 0;
+      
+      html += `
+        <tr class="manager-row ${colorClass}">
+          <td class="manager-name">${escapeHtml(manager)}</td>
+          ${monthNames.map(month => {
+            const monthHours = Math.round(workloads[manager][month]);
+            const monthCapacity = capacity[month] || 0;
+            const monthColor = getCapacityColorClass(workloads[manager][month], monthCapacity);
+            return `<td class="hours-cell ${monthColor}">${monthHours}</td>`;
+          }).join('')}
+          <td class="total-cell ${colorClass}"><strong>${Math.round(allocated)}</strong></td>
+          <td class="capacity-cell ${colorClass}">
+            <div class="capacity-display">
+              <span class="capacity-value">${Math.round(allocated)} / ${Math.round(totalCapacity)}</span>
+              <span class="capacity-percent">${percentage}%</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+    
+    // Unassigned row
+    html += `
+      <tr class="unassigned-row">
+        <td class="manager-name">⚠️ Unassigned</td>
+        ${monthNames.map(month => {
+          const monthHours = Math.round(unassigned[month]);
+          return `<td class="hours-cell unassigned-cell">${monthHours > 0 ? monthHours : '-'}</td>`;
+        }).join('')}
+        <td class="total-cell unassigned-cell"><strong>${Math.round(totalUnassigned)}</strong></td>
+        <td class="capacity-cell">-</td>
+      </tr>
+    `;
+    
+    // Total row
+    const monthlyTotals = monthNames.map(month => {
+      let total = 0;
+      state.managers.forEach(manager => {
+        total += workloads[manager][month];
+      });
+      total += unassigned[month];
+      return Math.round(total);
+    });
+    
+    html += `
+      <tr class="total-row">
+        <td class="manager-name"><strong>📊 Total</strong></td>
+        ${monthlyTotals.map(total => `<td class="hours-cell"><strong>${total}</strong></td>`).join('')}
+        <td class="total-cell"><strong>${Math.round(grandTotal)}</strong></td>
+        <td class="capacity-cell">-</td>
+      </tr>
+    `;
+    
+    html += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    
+    overviewSection.innerHTML = html;
+  }
 }
 
 /**

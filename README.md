@@ -1,6 +1,6 @@
 # Workload Allocation Tool
 
-A professional web application for accounting firms to automatically allocate client workloads to managers based on capacity and workload balancing.
+A professional web application for accounting firms to automatically allocate client workloads to managers based on capacity, workload balancing, and partner preferences.
 
 ## ✨ Features
 
@@ -11,7 +11,10 @@ A professional web application for accounting firms to automatically allocate cl
   - Keeps client groups together under one manager
   - Respects manager capacity constraints
   - Uses squared deviation minimization for optimal balance
+  - Honors partner preferences with client locking
+- **🔒 Partner Preferences**: Import partner preference files to lock specific clients to designated managers
 - **🎯 Drag-and-Drop**: Manual adjustment of assignments with intuitive UI
+- **🔍 Search & Filter**: Quickly find clients and groups in the allocation board
 - **📈 Visual Dashboard**: Real-time workload overview by manager and month
 - **📤 Excel Export**: Generate Master List with 3 sheets:
   - Master Data (with formulas)
@@ -53,7 +56,7 @@ http://127.0.0.1:3000
 
 ### Step 1: Import Client Data
 
-1. Click **"Import Excel"** button
+1. Click **"Import Workload"** button
 2. Select your Excel file (.xlsx or .xls)
 3. File must contain these columns:
    - `Client Name` - Name of the client
@@ -78,28 +81,52 @@ You can:
 - Delete managers (assigned clients will become unassigned)
 - Add multiple managers before allocation
 
-### Step 3: Run Allocation
+### Step 3: Import Partner Preferences (Optional)
+
+1. Click **"Import Preferences"** button
+2. Select your preferences Excel file
+3. File must contain these columns:
+   - `Group` - (Optional) Client group name
+   - `Client Name` or `Client` - Individual client name
+   - `Partner` - Partner name
+   - `Proposed Manager` or `Manager` - Desired manager assignment
+
+**How it works:**
+- Matches clients/groups from your workload to preference file
+- Assigns matched clients to specified managers
+- **Locks** these assignments (marked with 🔒)
+- Locked clients are excluded from automatic allocation
+- You'll see a summary of matched and unmatched preferences
+
+**Unlock clients:**
+- Click the lock icon (🔒) on any locked client card
+- This allows the client to be reassigned
+
+### Step 4: Run Allocation
 
 1. Click **"Run Allocation"** button
 2. Confirm the action
 3. The algorithm will:
-   - Group clients by Group field (if present)
+   - Skip locked clients (from partner preferences)
+   - Group remaining clients by Group field (if present)
    - Sort by total hours (largest first)
    - Assign to managers with best fit
    - Balance monthly workloads
    - Respect capacity constraints
 
-### Step 4: Manual Adjustments
+### Step 5: Manual Adjustments
 
 After allocation, you can:
 - **Drag individual clients** between manager columns
 - **Drag entire groups** to move all clients together
+- **Search for clients** using the search box
 - **View monthly breakdowns** in each manager column
+- **Lock/unlock clients** to prevent reassignment
 - Changes save automatically
 
-### Step 5: Export Results
+### Step 6: Export Results
 
-1. Click **"Export to Excel"** button
+1. Click **"Export"** button
 2. File downloads as `Master_List.xlsx`
 3. Contains 3 sheets with complete allocation data
 4. Formulas automatically calculate totals
@@ -109,30 +136,32 @@ After allocation, you can:
 ### Backend (Node.js + Express)
 
 ```
-server.js           - Main server with API routes
+server.js                - Main server with API routes
 src/
-  ├── import.js     - Excel parsing and data normalization
-  ├── storage.js    - Persistent state management
-  ├── allocate.js   - Workload balancing algorithm
-  └── export.js     - Excel generation with formulas
+  ├── constants.js       - Centralized constants (MONTH_NAMES)
+  ├── import.js          - Excel parsing and data normalization
+  ├── storage.js         - Persistent state management
+  ├── allocate.js        - Workload balancing algorithm
+  ├── export.js          - Excel generation with formulas
+  └── partner-preferences.js - Partner preference import and locking
 ```
 
 ### Frontend (Vanilla JavaScript)
 
 ```
 public/
-  ├── index.html    - Main HTML structure
-  ├── styles.css    - Responsive styling
-  └── app.js        - Interactive UI and drag-drop
+  ├── index.html         - Main HTML structure
+  ├── styles.css         - Responsive styling
+  └── app.js             - Interactive UI and drag-drop
 ```
 
 ### Data Storage
 
 ```
 data/
-  └── state.json    - Persistent application state
-uploads/            - Temporary file uploads
-output/             - Generated Excel exports
+  └── state.json         - Persistent application state
+uploads/                 - Temporary file uploads
+output/                  - Generated Excel exports
 ```
 
 ## 🔧 API Endpoints
@@ -140,11 +169,14 @@ output/             - Generated Excel exports
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/state` | Get current application state |
-| POST | `/api/import` | Import Excel file |
+| POST | `/api/import` | Import workload Excel file |
+| POST | `/api/preferences/import` | Import partner preferences |
 | POST | `/api/managers` | Add a new manager |
 | DELETE | `/api/managers/:name` | Delete a manager |
 | PUT | `/api/managers/:name/capacity` | Update manager capacity |
 | PATCH | `/api/clients/:id` | Update client assignment |
+| PATCH | `/api/clients/:id/lock` | Lock/unlock a client |
+| POST | `/api/clients/:id/unlock` | Unlock a specific client |
 | POST | `/api/allocate` | Run allocation algorithm |
 | GET | `/api/export` | Export to Excel |
 
@@ -156,6 +188,7 @@ output/             - Generated Excel exports
 - ✅ **Size Limits**: 10MB maximum file upload size
 - ✅ **Capacity Limits**: Maximum 10,000 hours per month
 - ✅ **Error Handling**: Comprehensive error messages without leaking internals
+- ✅ **Manager Name Validation**: Length and character restrictions
 
 ## 🎨 User Experience Enhancements
 
@@ -165,30 +198,34 @@ output/             - Generated Excel exports
 - ✅ **Keyboard Support**: Modal can be closed with Escape key
 - ✅ **Responsive Design**: Works on all screen sizes
 - ✅ **File Reset**: Can re-import same file multiple times
+- ✅ **Search Functionality**: Filter clients and groups
+- ✅ **Lock Indicators**: Visual feedback for locked assignments
 
 ## 🧮 Allocation Algorithm
 
 The allocation algorithm uses a **cost minimization approach**:
 
-1. **Calculate Targets**: Divide total hours by number of managers
-2. **Group Priority**: Assign groups first to keep them together
-3. **Size Ordering**: Process largest clients/groups first
-4. **Cost Function**: Minimize sum of squared deviations from target
-5. **Capacity Checking**: Reject assignments that exceed capacity
-6. **Tie Breaking**: Use total load and alphabetical order
+1. **Skip Locked Clients**: Clients locked via partner preferences are excluded
+2. **Calculate Targets**: Divide total hours by number of managers
+3. **Group Priority**: Assign groups first to keep them together
+4. **Size Ordering**: Process largest clients/groups first
+5. **Cost Function**: Minimize sum of squared deviations from target
+6. **Capacity Checking**: Reject assignments that exceed capacity
+7. **Tie Breaking**: Use total load and alphabetical order
 
 **Formula**: 
 ```
 Cost = Σ(projected_load - target)² for all months
 ```
 
-This ensures balanced workloads across all months while respecting constraints.
+This ensures balanced workloads across all months while respecting constraints and partner preferences.
 
 ## 📊 Excel Export Format
 
 ### Sheet 1: Master Data
 - Complete client list with monthly hours
 - Total column with SUM formulas
+- Manager assignments
 - Ready for further analysis
 
 ### Sheet 2: Manager Time By Month
@@ -201,6 +238,37 @@ This ensures balanced workloads across all months while respecting constraints.
 - Manager → Partner → Total hours
 - Easy to see partner distribution
 
+## 🔒 Partner Preferences Workflow
+
+### Creating a Preferences File
+
+Your Excel file should have these columns:
+
+| Group | Client Name | Partner | Proposed Manager |
+|-------|-------------|---------|------------------|
+| Group A | | John Smith | Alice |
+| | Acme Corp | Jane Doe | Bob |
+
+**Rules:**
+- If `Group` is specified, all clients in that group are assigned
+- If `Client Name` is specified, only that specific client is assigned
+- Group preferences take priority
+- Manager must exist before importing preferences
+
+### Understanding Lock Status
+
+- 🔒 **Locked**: Client assigned via partner preferences
+- 🔓 **Unlocked**: Client can be reassigned by allocation algorithm
+- Click lock icon to toggle status
+
+### Best Practices
+
+1. **Import Order**: Import workload → Add managers → Import preferences → Allocate
+2. **Verify Managers**: Ensure all managers in preference file exist in the system
+3. **Review Results**: Check the import summary for unmatched clients/managers
+4. **Lock Strategy**: Only lock clients that must stay with specific managers
+5. **Flexibility**: Leave some clients unlocked for optimal workload balancing
+
 ## 🐛 Troubleshooting
 
 ### Import Fails
@@ -208,13 +276,20 @@ This ensures balanced workloads across all months while respecting constraints.
 - **Verify columns**: Ensure all required columns exist
 - **Check data**: Client Name column must have values
 
+### Preferences Not Applied
+- **Manager exists**: Proposed managers must be added first
+- **Client match**: Client/group names must match exactly (case-insensitive)
+- **Check summary**: Review import results for unmatched items
+
 ### Allocation Doesn't Balance
 - **Review capacity**: Ensure managers have sufficient capacity
-- **Check client hours**: Very large clients may be hard to balance
+- **Check locked clients**: Too many locks can prevent optimal balance
 - **Consider groups**: Groups stay together, affecting balance
+- **Large clients**: Very large clients may be hard to balance
 
 ### Drag-and-Drop Not Working
 - **Check browser**: Modern browser required (Chrome, Firefox, Edge, Safari)
+- **Locked clients**: Cannot drag locked clients
 - **Reload page**: Try refreshing if UI becomes unresponsive
 
 ### Export Error
@@ -227,7 +302,9 @@ State is automatically saved to `data/state.json` after every change:
 - Adding/removing managers
 - Updating capacity
 - Importing clients
+- Importing preferences
 - Moving clients
+- Locking/unlocking clients
 - Running allocation
 
 **Backup**: Recommended to periodically back up `data/state.json`
@@ -235,19 +312,25 @@ State is automatically saved to `data/state.json` after every change:
 ## 🚀 Advanced Usage
 
 ### Custom Capacity Patterns
-You can set different capacity for each month to account for:
+Set different capacity for each month to account for:
 - Vacation periods
 - Busy seasons (tax season, year-end)
 - Part-time schedules
 
 ### Re-running Allocation
-You can run allocation multiple times with different manager setups to find the optimal configuration.
+Run allocation multiple times with different manager setups to find optimal configuration. Locked clients remain assigned.
 
 ### Group Management
 Use the Group field strategically:
 - Group by industry
 - Group by service line
 - Group by relationship
+
+### Hybrid Approach
+Combine partner preferences with automatic allocation:
+1. Lock critical client relationships
+2. Let algorithm balance remaining work
+3. Manually adjust edge cases
 
 ## 🤝 Contributing
 
@@ -258,6 +341,7 @@ This tool was built following best practices:
 - ✅ Input validation
 - ✅ No placeholder code
 - ✅ RESTful API design
+- ✅ DRY principle (centralized constants)
 
 ## 📝 License
 
@@ -273,16 +357,22 @@ For issues or questions:
 
 ## 🎯 Version History
 
-### Version 1.0.0 (Current)
+### Version 1.1.0 (Current)
+- ✅ Partner preferences import
+- ✅ Client locking functionality
+- ✅ Search and filter
+- ✅ Centralized constants
+- ✅ Enhanced validation
+- ✅ Better error messages
+
+### Version 1.0.0
 - ✅ Initial release
 - ✅ Excel import/export
 - ✅ Automatic allocation
 - ✅ Drag-and-drop interface
 - ✅ Manager capacity management
 - ✅ Persistent storage
-- ✅ Loading indicators
 - ✅ Security enhancements
-- ✅ Input validation
 
 ---
 

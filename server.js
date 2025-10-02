@@ -346,13 +346,14 @@ app.put('/api/managers/:name/capacity', async (req, res, next) => {
 
 /**
  * PATCH /api/clients/:id
- * Update client assignment (e.g., change manager)
+ * Update client details (Manager, Group, Partner)
+ * NEW: Support for editing Group and Partner fields
  * BUG #4 FIX: Use case-insensitive manager validation
  */
 app.patch('/api/clients/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { Manager } = req.body;
+    const { Manager, Group, Partner } = req.body;
     
     if (!id) {
       throw new Error('Client ID is required');
@@ -366,19 +367,43 @@ app.patch('/api/clients/:id', async (req, res, next) => {
       throw new Error(`Client not found with ID: ${id}`);
     }
     
-    // If assigning to a manager, validate manager exists (case-insensitive)
-    if (Manager && Manager !== '') {
-      // BUG #4 FIX: Use centralized case-insensitive lookup
-      const exactManagerName = findManager(state.managers, Manager);
+    // Update Group if provided
+    if (Group !== undefined) {
+      const trimmedGroup = typeof Group === 'string' ? Group.trim() : '';
+      client.Group = trimmedGroup;
       
-      if (!exactManagerName) {
-        throw new Error(`Manager "${Manager}" not found`);
+      // If joining an existing group, adopt that group's manager automatically
+      if (trimmedGroup) {
+        const existingGroupClient = state.clients.find(
+          c => c.Group && c.Group.toLowerCase() === trimmedGroup.toLowerCase() && 
+               c.id !== id && c.Manager
+        );
+        if (existingGroupClient) {
+          client.Manager = existingGroupClient.Manager;
+        }
       }
-      
-      // Use the exact manager name from storage (preserves casing consistency)
-      client.Manager = exactManagerName;
-    } else {
-      client.Manager = '';
+    }
+    
+    // Update Partner if provided
+    if (Partner !== undefined) {
+      client.Partner = typeof Partner === 'string' ? Partner.trim() : '';
+    }
+    
+    // Update Manager if explicitly provided (this takes precedence over group assignment)
+    if (Manager !== undefined) {
+      if (Manager && Manager !== '') {
+        // BUG #4 FIX: Use centralized case-insensitive lookup
+        const exactManagerName = findManager(state.managers, Manager);
+        
+        if (!exactManagerName) {
+          throw new Error(`Manager "${Manager}" not found`);
+        }
+        
+        // Use the exact manager name from storage (preserves casing consistency)
+        client.Manager = exactManagerName;
+      } else {
+        client.Manager = '';
+      }
     }
     
     await saveState(state);

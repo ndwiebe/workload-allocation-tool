@@ -36,7 +36,7 @@ function setupEventListeners() {
   // Search functionality
   document.getElementById('searchBox').addEventListener('input', handleSearch);
   
-  // Event delegation for group toggle (SECURITY FIX - Bug #3)
+  // Event delegation for group toggle
   document.addEventListener('click', (e) => {
     const row = e.target.closest('[data-action="toggle-group"]');
     if (row) {
@@ -45,7 +45,19 @@ function setupEventListeners() {
     }
   });
   
-  // Handle keyboard navigation for accessibility (Bug #3)
+  // Event delegation for client row clicks (NEW)
+  document.addEventListener('click', (e) => {
+    const row = e.target.closest('.client-row');
+    if (row && !e.target.classList.contains('manager-select') && 
+        !e.target.classList.contains('action-btn')) {
+      const clientId = row.getAttribute('data-client-id');
+      if (clientId) {
+        showEditClientModal(clientId);
+      }
+    }
+  });
+  
+  // Handle keyboard navigation for accessibility
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       const row = e.target.closest('[data-action="toggle-group"]');
@@ -469,7 +481,7 @@ function renderTable() {
   
   let html = '';
   
-  // Render groups (SECURITY FIX - Bug #3: Use event delegation instead of inline onclick)
+  // Render groups
   Object.keys(groups).sort().forEach(groupName => {
     const groupClients = groups[groupName];
     const isLocked = groupClients.some(c => c.locked);
@@ -481,7 +493,7 @@ function renderTable() {
     const groupMonthlyHours = calculateGroupMonthlyHours(groupClients);
     const groupTotal = monthNames.reduce((sum, month) => sum + groupMonthlyHours[month], 0);
     
-    // Group header row - using data attributes for event delegation (Bug #3 fix)
+    // Group header row - using data attributes for event delegation
     html += `
       <tr class="group-header ${isLocked ? 'locked-row' : ''} ${isCollapsed ? 'collapsed' : 'expanded'}" 
           data-group-name="${escapeHtml(groupName)}"
@@ -529,7 +541,7 @@ function renderClientRow(client, isInGroup) {
   const rowClass = client.locked ? 'locked-row' : '';
   
   return `
-    <tr class="client-row ${rowClass}" data-client-id="${client.id}">
+    <tr class="client-row ${rowClass}" data-client-id="${client.id}" style="cursor:pointer;" title="Click to edit client details">
       <td class="client-cell">
         ${isInGroup ? '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' : ''}${lockIcon}${escapeHtml(client.Client)}
       </td>
@@ -566,6 +578,141 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+/**
+ * Show edit client modal (NEW FEATURE)
+ * @param {string} clientId - Client ID to edit
+ */
+function showEditClientModal(clientId) {
+  const client = state.clients.find(c => c.id === clientId);
+  if (!client) return;
+  
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalBody = document.getElementById('modalBody');
+  
+  modalTitle.textContent = '✏️ Edit Client Details';
+  
+  modalBody.innerHTML = `
+    <div class="form-group">
+      <label>Client Name</label>
+      <input type="text" value="${escapeHtml(client.Client)}" disabled style="background:#f5f5f5;cursor:not-allowed;">
+      <small style="color:#666;display:block;margin-top:5px;">Client names cannot be edited</small>
+    </div>
+    <div class="form-group">
+      <label>Group</label>
+      <input type="text" id="editGroup" value="${escapeHtml(client.Group || '')}" placeholder="Leave blank for individual client" maxlength="200">
+      <small style="color:#666;display:block;margin-top:5px;">
+        💡 Tip: Type a group name to join/create a group. Clients in the same group will be assigned to the same manager automatically.
+      </small>
+    </div>
+    <div class="form-group">
+      <label>Partner</label>
+      <input type="text" id="editPartner" value="${escapeHtml(client.Partner || '')}" placeholder="Enter partner name" maxlength="200">
+    </div>
+    <div class="form-group">
+      <label>Manager</label>
+      <select id="editManager" ${client.locked ? 'disabled' : ''}>
+        <option value="">Unassigned</option>
+        ${state.managers.map(m => `
+          <option value="${escapeHtml(m)}" ${client.Manager === m ? 'selected' : ''}>
+            ${escapeHtml(m)}
+          </option>
+        `).join('')}
+      </select>
+      ${client.locked ? `
+        <small style="color:#e63946;display:block;margin-top:5px;">
+          🔒 This client is locked. Manager cannot be changed.
+        </small>
+      ` : `
+        <small style="color:#666;display:block;margin-top:5px;">
+          ℹ️ Note: If you join an existing group, the manager will be auto-assigned to match the group
+        </small>
+      `}
+    </div>
+    <div style="display: flex; gap: 12px; margin-top: 24px;">
+      <button class="btn btn-primary" onclick="saveClientEdit('${client.id}')" style="flex: 1;">
+        💾 Save Changes
+      </button>
+      <button class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">
+        ❌ Cancel
+      </button>
+    </div>
+  `;
+  
+  modal.style.display = 'block';
+  
+  // Focus on first editable field
+  setTimeout(() => {
+    document.getElementById('editGroup').focus();
+  }, 100);
+}
+
+/**
+ * Save client edit changes (NEW FEATURE)
+ * @param {string} clientId - Client ID to save
+ */
+async function saveClientEdit(clientId) {
+  const group = document.getElementById('editGroup').value.trim();
+  const partner = document.getElementById('editPartner').value.trim();
+  const manager = document.getElementById('editManager').value;
+  
+  const client = state.clients.find(c => c.id === clientId);
+  if (!client) {
+    alert('Client not found');
+    return;
+  }
+  
+  showLoading('Saving changes...');
+  
+  try {
+    const response = await fetch(`/api/clients/${clientId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        Group: group,
+        Partner: partner,
+        Manager: manager
+      })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      state = data.state;
+      renderUI();
+      closeModal();
+      
+      // Show success message with what changed
+      let changes = [];
+      if (group !== (client.Group || '')) {
+        if (group) {
+          changes.push(`joined group "${group}"`);
+        } else {
+          changes.push('removed from group');
+        }
+      }
+      if (partner !== (client.Partner || '')) changes.push('partner updated');
+      if (manager !== (client.Manager || '')) {
+        if (manager) {
+          changes.push(`assigned to ${manager}`);
+        } else {
+          changes.push('unassigned');
+        }
+      }
+      
+      if (changes.length > 0) {
+        alert(`✅ Client updated successfully!\n\n${changes.join(', ')}`);
+      }
+    } else {
+      alert('Error: ' + data.error);
+    }
+  } catch (error) {
+    console.error('Error updating client:', error);
+    alert('Error updating client: ' + error.message);
+  } finally {
+    hideLoading();
+  }
 }
 
 /**
@@ -887,14 +1034,14 @@ function editManagerCapacity(manager) {
 }
 
 /**
- * Save manager capacity (Bug #5 FIX: Validate ALL inputs before making ANY changes)
+ * Save manager capacity
  * @param {string} manager - Manager name
  */
 async function saveManagerCapacity(manager) {
   const capacity = {};
   const errors = [];
   
-  // VALIDATE ALL INPUTS FIRST (Bug #5 fix)
+  // VALIDATE ALL INPUTS FIRST
   for (const month of monthNames) {
     const input = document.getElementById(`capacity-${month}`);
     const value = parseFloat(input.value);

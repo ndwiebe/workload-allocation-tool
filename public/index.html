@@ -8,32 +8,82 @@
 </head>
 <body>
   <div class="container">
-    <header>
+    <div class="header">
       <h1>Workload Allocation Tool</h1>
-      <div class="action-bar">
-        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
-        <button id="importBtn" class="btn btn-primary">Import Excel</button>
-        <button id="addManagerBtn" class="btn btn-secondary">Add Manager</button>
-        <button id="allocateBtn" class="btn btn-success">Run Allocation</button>
-        <button id="exportBtn" class="btn btn-info">Export to Excel</button>
+      <div class="action-buttons">
+        <button id="settingsBtn" class="btn btn-secondary">
+          <span>⚙️</span>
+          Settings
+        </button>
+        <button id="allocateBtn" class="btn btn-primary">
+          <span>📊</span>
+          Run Allocation
+        </button>
       </div>
-    </header>
-
-    <section class="manager-capacity">
-      <h2>Manager Capacity (hours per month)</h2>
-      <div id="managerList"></div>
-    </section>
-
-    <section class="allocation-board">
-      <h2>Allocation Board</h2>
-      <div id="columns" class="columns"></div>
-    </section>
+    </div>
+    
+    <!-- Hidden file inputs -->
+    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+    <input type="file" id="preferencesInput" accept=".xlsx,.xls" style="display:none">
+    
+    <!-- Metrics Grid -->
+    <div id="metricsGrid" class="metrics-grid"></div>
+    
+    <!-- Table Section -->
+    <div class="table-section">
+      <div class="table-header">
+        <div class="table-title">Client Allocation</div>
+        <div class="table-controls">
+          <input type="text" id="searchBox" class="search-box" placeholder="Search clients...">
+          <div class="view-toggle">
+            <button class="view-btn active">📋 Table</button>
+            <button class="view-btn">📊 Chart</button>
+            <button class="view-btn">🗓️ Calendar</button>
+          </div>
+          <button id="importBtn" class="btn btn-secondary">📥 Import Workload</button>
+          <button id="importPreferencesBtn" class="btn btn-secondary" disabled>🔒 Import Preferences</button>
+          <button id="addManagerBtn" class="btn btn-secondary">➕ Add Manager</button>
+          <button id="exportBtn" class="btn btn-secondary">📤 Export</button>
+        </div>
+      </div>
+      
+      <div class="table-container">
+        <table id="allocationTable">
+          <thead>
+            <tr>
+              <th style="width: 280px;">Client / Group</th>
+              <th style="width: 120px;">Partner</th>
+              <th style="width: 160px;">Manager</th>
+              <th>Jan</th>
+              <th>Feb</th>
+              <th>Mar</th>
+              <th>Apr</th>
+              <th>May</th>
+              <th>Jun</th>
+              <th>Jul</th>
+              <th>Aug</th>
+              <th>Sep</th>
+              <th>Oct</th>
+              <th>Nov</th>
+              <th>Dec</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr>
+              <td colspan="16" class="loading">No clients imported yet. Click "Import Workload" to get started.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
+  <!-- Modal -->
   <div id="modal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
-      <h2 id="modalTitle">Add Manager</h2>
+      <h2 id="modalTitle">Modal</h2>
       <div id="modalBody"></div>
     </div>
   </div>

@@ -1,4 +1,4 @@
-const { monthNames } = require('./constants');
+const { MONTH_NAMES } = require('./constants');
 
 /**
  * Allocate clients to managers with workload balancing
@@ -84,13 +84,13 @@ function calculateMonthlyTargets(clients, managerCount) {
   };
   
   clients.forEach(client => {
-    monthNames.forEach(month => {
+    MONTH_NAMES.forEach(month => {
       totals[month] += client.months[month] || 0;
     });
   });
   
   const targets = {};
-  monthNames.forEach(month => {
+  MONTH_NAMES.forEach(month => {
     targets[month] = totals[month] / managerCount;
   });
   
@@ -110,7 +110,7 @@ function aggregateMonthlyHours(clients) {
   };
   
   clients.forEach(client => {
-    monthNames.forEach(month => {
+    MONTH_NAMES.forEach(month => {
       totals[month] += client.months[month] || 0;
     });
   });
@@ -135,7 +135,7 @@ function findBestManager(monthlyHours, managers, loads, targets, capacities) {
   managers.forEach(manager => {
     let wouldExceedCapacity = false;
     
-    for (const month of monthNames) {
+    for (const month of MONTH_NAMES) {
       const projectedLoad = loads[manager][month] + (monthlyHours[month] || 0);
       if (projectedLoad > capacities[manager][month]) {
         wouldExceedCapacity = true;
@@ -146,13 +146,13 @@ function findBestManager(monthlyHours, managers, loads, targets, capacities) {
     if (wouldExceedCapacity) return;
     
     let cost = 0;
-    monthNames.forEach(month => {
+    MONTH_NAMES.forEach(month => {
       const projectedLoad = loads[manager][month] + (monthlyHours[month] || 0);
       const deviation = projectedLoad - targets[month];
       cost += deviation * deviation;
     });
     
-    const totalLoad = monthNames.reduce((sum, month) => sum + loads[manager][month], 0);
+    const totalLoad = MONTH_NAMES.reduce((sum, month) => sum + loads[manager][month], 0);
     
     if (cost < lowestCost || 
         (cost === lowestCost && totalLoad < lowestTotalLoad) ||
@@ -167,7 +167,7 @@ function findBestManager(monthlyHours, managers, loads, targets, capacities) {
     let minOverage = Infinity;
     managers.forEach(manager => {
       let maxOverage = 0;
-      monthNames.forEach(month => {
+      MONTH_NAMES.forEach(month => {
         const projectedLoad = loads[manager][month] + (monthlyHours[month] || 0);
         const overage = Math.max(0, projectedLoad - capacities[manager][month]);
         maxOverage = Math.max(maxOverage, overage);
@@ -189,7 +189,7 @@ function findBestManager(monthlyHours, managers, loads, targets, capacities) {
  * @param {Object} monthlyHours - Hours to add
  */
 function updateLoads(loads, manager, monthlyHours) {
-  monthNames.forEach(month => {
+  MONTH_NAMES.forEach(month => {
     loads[manager][month] += monthlyHours[month] || 0;
   });
 }

@@ -228,7 +228,7 @@ function renderTable() {
     
     // Group header row
     html += `
-      <tr class="${isLocked ? 'locked-row' : ''}">
+      <tr class="group-header ${isLocked ? 'locked-row' : ''}">
         <td class="group-cell" colspan="2">
           ${lockIcon}<strong>📁 ${escapeHtml(groupName)}</strong> (${groupClients.length} clients)
         </td>
@@ -261,7 +261,7 @@ function renderClientRow(client, isInGroup) {
   const rowClass = client.locked ? 'locked-row' : '';
   
   return `
-    <tr class="${rowClass}" data-client-id="${client.id}">
+    <tr class="client-row ${rowClass}" data-client-id="${client.id}">
       <td class="client-cell">
         ${isInGroup ? '&nbsp;&nbsp;&nbsp;&nbsp;' : ''}${lockIcon}${escapeHtml(client.Client)}
       </td>
@@ -363,17 +363,51 @@ async function unlockClient(clientId) {
 
 /**
  * Handle search functionality
+ * Filters client rows and shows/hides group headers based on visibility of their children
  */
 function handleSearch(e) {
   const searchTerm = e.target.value.toLowerCase();
   const rows = document.querySelectorAll('#tableBody tr');
   
+  // First pass: filter client rows (non-group-header rows)
   rows.forEach(row => {
+    // Skip group header rows in first pass
+    if (row.classList.contains('group-header')) {
+      return;
+    }
+    
     const text = row.textContent.toLowerCase();
     if (text.includes(searchTerm)) {
       row.style.display = '';
     } else {
       row.style.display = 'none';
+    }
+  });
+  
+  // Second pass: show/hide group headers based on their children's visibility
+  rows.forEach((row, index) => {
+    if (row.classList.contains('group-header')) {
+      // This is a group header row
+      // Check if any of the following rows (until next group header) are visible
+      let hasVisibleChildren = false;
+      
+      for (let i = index + 1; i < rows.length; i++) {
+        const nextRow = rows[i];
+        
+        // Stop if we hit another group header
+        if (nextRow.classList.contains('group-header')) {
+          break;
+        }
+        
+        // Check if this child row is visible
+        if (nextRow.style.display !== 'none') {
+          hasVisibleChildren = true;
+          break;
+        }
+      }
+      
+      // Show group header only if it has visible children
+      row.style.display = hasVisibleChildren ? '' : 'none';
     }
   });
 }

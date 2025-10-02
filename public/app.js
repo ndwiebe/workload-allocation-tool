@@ -4,6 +4,9 @@ let state = {
   clients: []
 };
 
+// Track which groups are collapsed (default: all collapsed)
+let collapsedGroups = new Set();
+
 const monthNames = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -121,6 +124,16 @@ async function loadState() {
     const data = await response.json();
     if (data.success) {
       state = data.state;
+      
+      // Initialize collapsed groups - all groups start collapsed
+      const groups = {};
+      state.clients.forEach(client => {
+        if (client.Group && !groups[client.Group]) {
+          groups[client.Group] = true;
+          collapsedGroups.add(client.Group);
+        }
+      });
+      
       renderUI();
       
       // Enable import preferences button if clients exist
@@ -183,6 +196,34 @@ function renderMetrics() {
 }
 
 /**
+ * Toggle group collapse/expand state
+ * @param {string} groupName - Name of the group to toggle
+ */
+function toggleGroup(groupName) {
+  if (collapsedGroups.has(groupName)) {
+    collapsedGroups.delete(groupName);
+  } else {
+    collapsedGroups.add(groupName);
+  }
+  renderTable();
+}
+
+/**
+ * Calculate aggregated monthly hours for a group of clients
+ * @param {Array} clients - Array of client objects
+ * @returns {Object} Object with monthly hours
+ */
+function calculateGroupMonthlyHours(clients) {
+  const monthlyHours = {};
+  monthNames.forEach(month => {
+    monthlyHours[month] = clients.reduce((sum, client) => {
+      return sum + (client.months[month] || 0);
+    }, 0);
+  });
+  return monthlyHours;
+}
+
+/**
  * Render allocation table
  */
 function renderTable() {
@@ -224,22 +265,41 @@ function renderTable() {
   Object.keys(groups).sort().forEach(groupName => {
     const groupClients = groups[groupName];
     const isLocked = groupClients.some(c => c.locked);
+    const isCollapsed = collapsedGroups.has(groupName);
     const lockIcon = isLocked ? '<span class="lock-icon">🔒</span>' : '';
+    const expandIcon = isCollapsed ? '▶' : '▼';
     
-    // Group header row
+    // Calculate aggregated hours for the group
+    const groupMonthlyHours = calculateGroupMonthlyHours(groupClients);
+    const groupTotal = monthNames.reduce((sum, month) => sum + groupMonthlyHours[month], 0);
+    
+    // Group header row with collapse/expand functionality
     html += `
-      <tr class="group-header ${isLocked ? 'locked-row' : ''}">
+      <tr class="group-header ${isLocked ? 'locked-row' : ''} ${isCollapsed ? 'collapsed' : 'expanded'}" 
+          onclick="toggleGroup('${escapeHtml(groupName).replace(/'/g, "\\'")}')"
+          onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleGroup('${escapeHtml(groupName).replace(/'/g, "\\'")}')); }"
+          tabindex="0"
+          role="button"
+          aria-expanded="${!isCollapsed}"
+          aria-label="${isCollapsed ? 'Expand' : 'Collapse'} group ${escapeHtml(groupName)}">
         <td class="group-cell" colspan="2">
+          <span class="expand-icon">${expandIcon}</span>
           ${lockIcon}<strong>📁 ${escapeHtml(groupName)}</strong> (${groupClients.length} clients)
         </td>
-        <td colspan="14"></td>
+        <td></td>
+        ${isCollapsed ? monthNames.map(month => `
+          <td class="hours-cell">${Math.round(groupMonthlyHours[month])}</td>
+        `).join('') : '<td colspan="12"></td>'}
+        ${isCollapsed ? `<td class="total-cell">${Math.round(groupTotal)}</td>` : '<td></td>'}
       </tr>
     `;
     
-    // Individual client rows in group
-    groupClients.forEach(client => {
-      html += renderClientRow(client, true);
-    });
+    // Individual client rows in group (hidden when collapsed)
+    if (!isCollapsed) {
+      groupClients.forEach(client => {
+        html += renderClientRow(client, true);
+      });
+    }
   });
   
   // Render individual clients
@@ -263,7 +323,7 @@ function renderClientRow(client, isInGroup) {
   return `
     <tr class="client-row ${rowClass}" data-client-id="${client.id}">
       <td class="client-cell">
-        ${isInGroup ? '&nbsp;&nbsp;&nbsp;&nbsp;' : ''}${lockIcon}${escapeHtml(client.Client)}
+        ${isInGroup ? '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' : ''}${lockIcon}${escapeHtml(client.Client)}
       </td>
       <td>${escapeHtml(client.Partner)}</td>
       <td>
@@ -449,6 +509,17 @@ function handleImport() {
       const data = await response.json();
       if (data.success) {
         state = data.state;
+        
+        // Reset collapsed groups - all groups start collapsed
+        collapsedGroups.clear();
+        const groups = {};
+        state.clients.forEach(client => {
+          if (client.Group && !groups[client.Group]) {
+            groups[client.Group] = true;
+            collapsedGroups.add(client.Group);
+          }
+        });
+        
         renderUI();
         alert(data.message);
       } else {
